@@ -8,12 +8,12 @@ with open("README.md", "r") as fh:
 setuptools.setup(
     name="MintyPython",
     version=__version__,
-    author="Pedro Silva, Junyao Chen, Chuyi Wang",
-    author_email="pedro.silva@libertymutual.com, Junyao.Chen@LibertyMutual.com, chuyi.wang@libertymutual.com",
+    author="Kmilo Aparicio",
+    author_email="kmilo.aparicio@gmail.com",
     description="Model INTerpretation with pYthon",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    url="https://git.forge.lmig.com/projects/PS/repos/mintypython",
+    # url="https://git.forge.lmig.com/projects/PS/repos/mintypython",
     packages=setuptools.find_packages(),
     install_requires=[
         "numpy",
