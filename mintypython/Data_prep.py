@@ -169,7 +169,7 @@ class Data_prep:
                 / data_to_plot_agg["weight"]
             )
 
-        if self.mintypython.fac_mapping != None:
+        if self.mintypython.fac_mapping != None and group_by_var in self.mintypython.fac_mapping:
             data_to_plot["x_axis"] = data_to_plot["x_axis"].map(
                 self.mintypython.fac_mapping[group_by_var]
             )

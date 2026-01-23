@@ -21,7 +21,7 @@ setuptools.setup(
         "scikit-learn",
         "xgboost",
         "shap",
-        "bokeh>=3.0.3",
+        "bokeh>=3.0.3,<3.3",
         "pyarrow",
         # "lightgbm>=3.3.2,<4",
         "matplotlib",

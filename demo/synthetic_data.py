@@ -148,21 +148,30 @@ def train_xgboost_model(data, feature_names, weight_col='exposure',
     return model
 
 
-def encode_categoricals(data, columns=None, verbose=True):
-    """
-    Encode object/string columns to category codes.
+def _is_string_dtype(dtype):
+    """Check if dtype is string-like (object, string, or StringDtype)."""
+    dtype_str = str(dtype)
+    return dtype_str in ['object', 'string'] or 'str' in dtype_str.lower()
 
-    Creates a new column with '_original' suffix containing the original
-    string values, and encodes the original column name with category codes.
+
+def encode_categoricals(data, columns=None, optimize=False, verbose=True):
+    """
+    Prepare DataFrame for modeling: encode categoricals and optionally optimize numerics.
+
+    - Always encodes object/string columns to integer codes (int8/int16)
+    - Always preserves original values in {col}_original columns as category dtype
+    - Optionally downcasts numeric columns (int64->int8/16/32, float64->float32)
 
     Parameters
     ----------
     data : pd.DataFrame
         Input data
     columns : list, optional
-        Specific columns to encode. If None, encodes all object columns.
+        Specific categorical columns to encode. If None, encodes all object/string columns.
+    optimize : bool, default False
+        If True, also downcasts numeric columns for memory efficiency.
     verbose : bool, default True
-        If True, prints log message listing encoded columns.
+        If True, prints encoding and optimization summary.
 
     Returns
     -------
@@ -174,33 +183,70 @@ def encode_categoricals(data, columns=None, verbose=True):
     data_encoded = data.copy()
     category_mappings = {}
     encoded_columns = []
+    numeric_optimized = []
 
-    # Determine columns to encode
+    initial_memory = data.memory_usage(deep=True).sum()
+
+    # Determine categorical columns to encode (object, string, StringDtype)
     if columns is None:
-        columns = data.select_dtypes(include=['object']).columns.tolist()
+        columns = [col for col in data.columns if _is_string_dtype(data[col].dtype)]
 
-    for col in columns:
-        if col in data.columns and data[col].dtype == 'object':
-            # Save original values with _original suffix
-            data_encoded[f'{col}_original'] = data[col]
-            # Encode the original column name
-            data_encoded[col] = data[col].astype('category').cat.codes
+    # Validate columns exist
+    missing_cols = [col for col in columns if col not in data.columns]
+    if missing_cols:
+        raise ValueError(f"Columns not found in DataFrame: {missing_cols}")
+
+    # Process all columns
+    for col in data_encoded.columns:
+        dtype = data_encoded[col].dtype
+        dtype_str = str(dtype)
+
+        # ALWAYS encode object/string columns
+        if col in columns and _is_string_dtype(dtype):
+            # Save original values as category dtype
+            data_encoded[f'{col}_original'] = data[col].astype('category')
+            # Encode to integer codes
+            cat_series = data[col].astype('category')
+            n_categories = len(cat_series.cat.categories)
+            code_dtype = 'int8' if n_categories <= 127 else 'int16'
+            data_encoded[col] = cat_series.cat.codes.astype(code_dtype)
             # Store mapping
-            category_mappings[col] = dict(enumerate(data[col].astype('category').cat.categories))
+            category_mappings[col] = dict(enumerate(cat_series.cat.categories))
             encoded_columns.append(col)
 
-    # Log encoded columns
-    if verbose and encoded_columns:
-        print(f"Encoded {len(encoded_columns)} categorical column(s): {encoded_columns}")
-        print(f"Original values preserved in: {[f'{col}_original' for col in encoded_columns]}")
+        # ONLY optimize numerics if optimize=True
+        elif optimize and dtype_str in ['int64', 'int32']:
+            original_dtype = dtype
+            data_encoded[col] = pd.to_numeric(data_encoded[col], downcast='integer')
+            if data_encoded[col].dtype != original_dtype:
+                numeric_optimized.append(f"{col}: {original_dtype} -> {data_encoded[col].dtype}")
+
+        elif optimize and dtype_str == 'float64':
+            original_dtype = dtype
+            data_encoded[col] = pd.to_numeric(data_encoded[col], downcast='float')
+            if data_encoded[col].dtype != original_dtype:
+                numeric_optimized.append(f"{col}: {original_dtype} -> {data_encoded[col].dtype}")
+
+    final_memory = data_encoded.memory_usage(deep=True).sum()
+    memory_reduction = (initial_memory - final_memory) / initial_memory * 100
+
+    if verbose:
+        if encoded_columns:
+            print(f"Encoded {len(encoded_columns)} categorical column(s): {encoded_columns}")
+            print(f"Original values preserved in: {[f'{col}_original' for col in encoded_columns]}")
+        if numeric_optimized:
+            print(f"Optimized {len(numeric_optimized)} numeric column(s):")
+            for change in numeric_optimized:
+                print(f"  {change}")
+        print(f"Memory: {initial_memory/1024:.1f}KB -> {final_memory/1024:.1f}KB ({memory_reduction:.1f}% reduction)")
 
     return data_encoded, category_mappings
 
 
-def prepare_data_for_mintypython(data, feature_names, encode=False, verbose=True):
+def prepare_data_for_mintypython(data, feature_names, optimize=False, verbose=True):
     """
     Prepare data DataFrame for use with MintyPython.
-    Encodes categorical variables as needed.
+    Encodes categorical variables and optionally optimizes numeric dtypes.
 
     Parameters
     ----------
@@ -208,34 +254,27 @@ def prepare_data_for_mintypython(data, feature_names, encode=False, verbose=True
         Raw data with categorical columns
     feature_names : list
         List of feature column names
-    encode : bool, default False
-        If True, uses encode_categoricals() which preserves original
-        values in {column}_original columns
+    optimize : bool, default False
+        If True, also downcasts numeric columns for memory efficiency
     verbose : bool, default True
-        If True and encode=True, prints log message listing encoded columns.
+        If True, prints log messages about encoding and optimization.
 
     Returns
     -------
     pd.DataFrame
-        Data with encoded categorical variables
+        Data with encoded categorical variables (and {col}_original columns)
     dict
         Mapping of categorical values to codes
     """
-    if encode:
-        # Use encode_categoricals for suggested encoding with _original columns
-        object_cols = [col for col in feature_names if data[col].dtype == 'object']
-        return encode_categoricals(data, columns=object_cols, verbose=verbose)
+    # Validate feature columns exist
+    missing_features = [col for col in feature_names if col not in data.columns]
+    if missing_features:
+        raise ValueError(f"Feature columns not found in DataFrame: {missing_features}")
 
-    # Legacy behavior (no _original columns)
-    data_encoded = data.copy()
-    category_mappings = {}
+    # Get categorical columns from feature_names (object, string, or StringDtype)
+    cat_cols = [col for col in feature_names if _is_string_dtype(data[col].dtype)]
 
-    for col in feature_names:
-        if data[col].dtype == 'object':
-            data_encoded[col] = data[col].astype('category').cat.codes
-            category_mappings[col] = dict(enumerate(data[col].astype('category').cat.categories))
-
-    return data_encoded, category_mappings
+    return encode_categoricals(data, columns=cat_cols, optimize=optimize, verbose=verbose)
 
 
 def get_demo_data_and_model(n_samples=10000, random_state=42):
