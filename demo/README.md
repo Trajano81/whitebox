@@ -39,7 +39,10 @@ You should see `(venv)` at the beginning of your terminal prompt when the enviro
 With the virtual environment activated, install the package:
 
 ```bash
-# Install mintypython with all dependencies (from project root)
+# Install all dependencies from requirements.txt (from project root)
+pip install -r requirements.txt
+
+# Install mintypython in development mode (from project root)
 pip install -e .
 
 # Install Jupyter notebook support
@@ -149,9 +152,9 @@ output_notebook()
 ```
 
 ### Missing dependencies
-The main `setup.py` includes all required dependencies. If you encounter missing packages:
+The `requirements.txt` file includes all required dependencies. If you encounter missing packages:
 ```bash
-pip install -e ..[dev]  # If dev extras are defined
-# OR install individually
-pip install xgboost shap bokeh matplotlib seaborn pandas numpy
+pip install -r requirements.txt  # Install all dependencies
+# OR reinstall the package
+pip install -e .
 ```

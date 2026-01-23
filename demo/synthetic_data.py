@@ -148,7 +148,56 @@ def train_xgboost_model(data, feature_names, weight_col='exposure',
     return model
 
 
-def prepare_data_for_mintypython(data, feature_names):
+def encode_categoricals(data, columns=None, verbose=True):
+    """
+    Encode object/string columns to category codes.
+
+    Creates a new column with '_original' suffix containing the original
+    string values, and encodes the original column name with category codes.
+
+    Parameters
+    ----------
+    data : pd.DataFrame
+        Input data
+    columns : list, optional
+        Specific columns to encode. If None, encodes all object columns.
+    verbose : bool, default True
+        If True, prints log message listing encoded columns.
+
+    Returns
+    -------
+    pd.DataFrame
+        Data with encoded columns and {col}_original columns
+    dict
+        Mapping of {column: {code: label}}
+    """
+    data_encoded = data.copy()
+    category_mappings = {}
+    encoded_columns = []
+
+    # Determine columns to encode
+    if columns is None:
+        columns = data.select_dtypes(include=['object']).columns.tolist()
+
+    for col in columns:
+        if col in data.columns and data[col].dtype == 'object':
+            # Save original values with _original suffix
+            data_encoded[f'{col}_original'] = data[col]
+            # Encode the original column name
+            data_encoded[col] = data[col].astype('category').cat.codes
+            # Store mapping
+            category_mappings[col] = dict(enumerate(data[col].astype('category').cat.categories))
+            encoded_columns.append(col)
+
+    # Log encoded columns
+    if verbose and encoded_columns:
+        print(f"Encoded {len(encoded_columns)} categorical column(s): {encoded_columns}")
+        print(f"Original values preserved in: {[f'{col}_original' for col in encoded_columns]}")
+
+    return data_encoded, category_mappings
+
+
+def prepare_data_for_mintypython(data, feature_names, encode=False, verbose=True):
     """
     Prepare data DataFrame for use with MintyPython.
     Encodes categorical variables as needed.
@@ -159,6 +208,11 @@ def prepare_data_for_mintypython(data, feature_names):
         Raw data with categorical columns
     feature_names : list
         List of feature column names
+    encode : bool, default False
+        If True, uses encode_categoricals() which preserves original
+        values in {column}_original columns
+    verbose : bool, default True
+        If True and encode=True, prints log message listing encoded columns.
 
     Returns
     -------
@@ -167,6 +221,12 @@ def prepare_data_for_mintypython(data, feature_names):
     dict
         Mapping of categorical values to codes
     """
+    if encode:
+        # Use encode_categoricals for suggested encoding with _original columns
+        object_cols = [col for col in feature_names if data[col].dtype == 'object']
+        return encode_categoricals(data, columns=object_cols, verbose=verbose)
+
+    # Legacy behavior (no _original columns)
     data_encoded = data.copy()
     category_mappings = {}
 
