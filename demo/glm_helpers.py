@@ -33,8 +33,14 @@ def create_glm_relativities(data, feature_names):
     # Age relativities (log scale, younger = higher risk)
     # GLM uses log link, so these are log-relativities
     if 'age' in feature_names:
-        age_centered = data['age'] - 40  # Base at age 40
-        glm_df['age'] = -0.015 * age_centered
+        age_min = data['age'].min()
+        age_max = data['age'].max()
+        # Linear interpolation: lowest age = log(1.2), highest age = log(0.8)
+        log_rel_min = np.log(1.2)  # ~0.182 for lowest age
+        log_rel_max = np.log(0.8)  # ~-0.223 for highest age
+        # Normalize age to [0, 1] then interpolate
+        age_normalized = (data['age'] - age_min) / (age_max - age_min)
+        glm_df['age'] = log_rel_min + age_normalized * (log_rel_max - log_rel_min)
 
     # Vehicle value relativities (log scale)
     if 'vehicle_value' in feature_names:
