@@ -29,6 +29,7 @@ setuptools.setup(
         "deepdiff",
         # "scorepyon @ git+ssh://git@github.com/lmigtech/scorepyon_bra.git@1.3.2",
         "scorepyon @ git+https://github.com/Trajano81/scoring_pricing.git",
+        "bidipy @ git+https://github.com/Trajano81/facbidpy.git",
         "ipython",
     ],
     python_requires=">=3.8",
