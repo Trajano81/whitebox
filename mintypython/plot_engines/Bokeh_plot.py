@@ -1,15 +1,15 @@
 # bokeh plot
 from bokeh.plotting import figure, output_file, show
-from bokeh.models import ColumnDataSource, LinearAxis, Range1d, Select, Legend
+from bokeh.models import ColumnDataSource, LinearAxis, Range1d, Select, Legend, FixedTicker
 import bokeh.io
 from bokeh.io import output_notebook, curdoc, push_notebook, show
 from bokeh.layouts import row, column
-from bokeh.transform import jitter
 from bokeh.palettes import magma, viridis, cividis, RdYlBu, Category20c, Spectral
 from collections import OrderedDict
 from .Plot_interface import Plot_interface
 from ..libs import *
 import pandas as pd
+import numpy as np
 
 bokeh.io.reset_output()
 bokeh.io.output_notebook()
@@ -46,6 +46,9 @@ class Bokeh_plot(Plot_interface):
         plot_data["agg_data"].index = plot_data["agg_data"].index.astype(str)
 
         x_axis_values = plot_data["agg_data"].index.values
+        # Create numeric indices for x-axis (avoids Bokeh FactorRange bugs)
+        x_indices = np.arange(len(x_axis_values))
+        x_map = {v: i for i, v in enumerate(x_axis_values)}
 
         w_avg = plot_data["agg_data"]["weight"].values
 
@@ -63,13 +66,16 @@ class Bokeh_plot(Plot_interface):
                         + str(x_axis_values)
                     )
 
-        # create a new plot
+        # create a new plot with numeric x-range
         p = figure(
             height=kwargs["height"],
             width=kwargs["width"],
             tooltips=T,
-            x_range=x_axis_values,
+            x_range=Range1d(-0.5, len(x_axis_values) - 0.5),
         )
+        # Configure x-axis with categorical labels at integer positions
+        p.xaxis.ticker = FixedTicker(ticks=list(x_indices))
+        p.xaxis.major_label_overrides = {i: str(v) for i, v in enumerate(x_axis_values)}
 
         # title
         p.title.text = kwargs["plot_name"]
@@ -97,7 +103,7 @@ class Bokeh_plot(Plot_interface):
         # add renderers
         ######################################
         # plot weight
-        source = ColumnDataSource(data=dict(var=x_axis_values, counts=w_avg))
+        source = ColumnDataSource(data=dict(var=x_indices, counts=w_avg))
         r_w = p.vbar(
             x="var",
             top="counts",
@@ -125,14 +131,17 @@ class Bokeh_plot(Plot_interface):
                         "shap"
                     ].values
 
+                # Add random jitter to categorical indices (avoids Bokeh jitter() bug)
+                x_map = {v: i for i, v in enumerate(x_axis_values)}
+                x_jittered = np.array([x_map.get(v, 0) for v in x_shap.values]) + np.random.uniform(-0.25, 0.25, len(x_shap))
                 source = ColumnDataSource(
                     data=dict(
-                        var=x_shap.values,
+                        var=x_jittered,
                         shap=plot_data["shap_points"]["shap"].values,
                     )
                 )
                 r_shap = p.circle(
-                    x=jitter("var", width=0.5, range=p.x_range),
+                    x="var",
                     y="shap",
                     source=source,
                     size=2,
@@ -153,7 +162,7 @@ class Bokeh_plot(Plot_interface):
                 avg_shap = avg_shap / avg_shap.iloc[base]
             source = ColumnDataSource(
                 data=dict(
-                    var=x_axis_values,
+                    var=x_indices,
                     top=avg_shap + plot_data["agg_data"]["shap_sd"],
                     bottom=avg_shap - plot_data["agg_data"]["shap_sd"],
                 )
@@ -187,7 +196,7 @@ class Bokeh_plot(Plot_interface):
 
                 lower = min(lower, np.nanmax([np.nanmin(avg / avgbase), mean - 3 * sd]))
                 upper = max(upper, np.nanmin([np.nanmax(avg / avgbase), mean + 3 * sd]))
-                source = ColumnDataSource(data=dict(var=x_axis_values, y=avg / avgbase))
+                source = ColumnDataSource(data=dict(var=x_indices, y=avg / avgbase))
                 r_avg = p.line(
                     x="var",
                     y="y",
@@ -223,7 +232,7 @@ class Bokeh_plot(Plot_interface):
             upper = max(upper, np.nanmax(sup / glmbase))
 
             s_avg = p.line(
-                x_axis_values,
+                x_indices,
                 sup / glmbase,
                 line_width=self.mintypython.config["line_width"]["glm_pred"],
                 line_dash="dashed",
@@ -231,7 +240,7 @@ class Bokeh_plot(Plot_interface):
                 color=self.mintypython.config["colors"]["glm_pred"],
             )
             i_avg = p.line(
-                x_axis_values,
+                x_indices,
                 inf / glmbase,
                 line_width=self.mintypython.config["line_width"]["glm_pred"],
                 line_dash="dashed",
@@ -334,6 +343,9 @@ class Bokeh_plot(Plot_interface):
         x2_levels = (
             data_to_plot["var2"].drop_duplicates().sort_values().astype(str).values
         )
+        # Create numeric indices for x-axis (avoids Bokeh FactorRange bugs)
+        x1_indices = np.arange(len(x1_levels))
+        x1_map = {v: i for i, v in enumerate(x1_levels)}
 
         if base is None:
             base = np.argmax(w_avg)
@@ -348,13 +360,16 @@ class Bokeh_plot(Plot_interface):
         # hover tips
         T = [("Name", "$name"), ("X", "@var"), ("Value", "$y")]
 
-        # creat a plot
+        # creat a plot with numeric x-range
         p = figure(
             height=kwargs["height"],
             width=kwargs["width"],
             tooltips=T,
-            x_range=x1_levels,
+            x_range=Range1d(-0.5, len(x1_levels) - 0.5),
         )
+        # Configure x-axis with categorical labels at integer positions
+        p.xaxis.ticker = FixedTicker(ticks=list(x1_indices))
+        p.xaxis.major_label_overrides = {i: str(v) for i, v in enumerate(x1_levels)}
 
         p.yaxis.axis_label = "Shapley value of " + var1
 
@@ -384,11 +399,12 @@ class Bokeh_plot(Plot_interface):
                 else:
                     shapbase = 1
 
-                x = (
+                x_cat = (
                     data_to_plot_agg.xs(level, level="var2")["shap_avg"]
                     .sort_index()
                     .index
                 )
+                x = np.array([x1_map.get(str(v), 0) for v in x_cat])
                 y = (
                     data_to_plot_agg.xs(level, level="var2")["shap_avg"].sort_index()
                     / shapbase
@@ -426,11 +442,12 @@ class Bokeh_plot(Plot_interface):
                 else:
                     glmbase = 1
 
-                x = (
+                x_cat = (
                     data_to_plot_agg.xs(level, level="var2")["glm_avg"]
                     .sort_index()
                     .index
                 )
+                x = np.array([x1_map.get(str(v), 0) for v in x_cat])
                 y = (
                     data_to_plot_agg.xs(level, level="var2")["glm_avg"].sort_index()
                     / glmbase
@@ -461,14 +478,17 @@ class Bokeh_plot(Plot_interface):
                 )
             
             if shap_points:
+                # Add random jitter to categorical indices (avoids Bokeh jitter() bug)
+                var1_values = shap_data.var1[shap_data.var2 == level].values
+                x_jittered = np.array([x1_map.get(str(v), 0) for v in var1_values]) + np.random.uniform(-0.25, 0.25, len(var1_values))
                 source = ColumnDataSource(
                     data=dict(
-                        var=shap_data.var1[shap_data.var2 == level].values,
+                        var=x_jittered,
                         shap=shap_data.shap[shap_data.var2 == level].values / shapbase,
                     )
                 )
                 r_shap = p.circle(
-                    x=jitter("var", width=0.5, range=p.x_range),
+                    x="var",
                     y="shap",
                     source=source,
                     size=2,
@@ -485,11 +505,12 @@ class Bokeh_plot(Plot_interface):
                     ]
                 else:
                     actbase = 1
-                xdata = (
+                xdata_cat = (
                     data_to_plot_agg.xs(level, level="var2")["actuals"]
                     .sort_index()
                     .index
                 )
+                xdata = np.array([x1_map.get(str(v), 0) for v in xdata_cat])
                 ydata = (
                     data_to_plot_agg.xs(level, level="var2")["actuals"].sort_index()
                     / actbase
@@ -534,11 +555,12 @@ class Bokeh_plot(Plot_interface):
                 else:
                     gbmpredbase = 1
 
-                xdata = (
+                xdata_cat = (
                     data_to_plot_agg.xs(level, level="var2")["gbm_pred"]
                     .sort_index()
                     .index
                 )
+                xdata = np.array([x1_map.get(str(v), 0) for v in xdata_cat])
                 ydata = (
                     data_to_plot_agg.xs(level, level="var2")["gbm_pred"].sort_index()
                     / gbmpredbase
@@ -580,7 +602,8 @@ class Bokeh_plot(Plot_interface):
         )
 
         # plot weight
-        source = ColumnDataSource(data=dict(var=w_avg.index, counts=w_avg))
+        w_avg_x = np.array([x1_map.get(str(v), 0) for v in w_avg.index])
+        source = ColumnDataSource(data=dict(var=w_avg_x, counts=w_avg))
         p.vbar(
             x="var",
             top="counts",
@@ -634,6 +657,9 @@ class Bokeh_plot(Plot_interface):
         merged_data.index = merged_data.index.astype(str)
 
         x_axis_values = merged_data.index.values
+        # Create numeric indices for x-axis (avoids Bokeh FactorRange bugs)
+        x_indices = np.arange(len(x_axis_values))
+        x_map = {v: i for i, v in enumerate(x_axis_values)}
 
         w_avg = merged_data["weight@" + kwargs["model_ids"][0]].values
 
@@ -651,13 +677,16 @@ class Bokeh_plot(Plot_interface):
                         + str(x_axis_values)
                     )
 
-        # create a new plot
+        # create a new plot with numeric x-range
         p = figure(
             height=kwargs["height"],
             width=kwargs["width"],
             tooltips=T,
-            x_range=x_axis_values,
+            x_range=Range1d(-0.5, len(x_axis_values) - 0.5),
         )
+        # Configure x-axis with categorical labels at integer positions
+        p.xaxis.ticker = FixedTicker(ticks=list(x_indices))
+        p.xaxis.major_label_overrides = {i: str(v) for i, v in enumerate(x_axis_values)}
 
         # title
         p.title.text = kwargs["plot_name"]
@@ -685,7 +714,7 @@ class Bokeh_plot(Plot_interface):
         # add renderers
         ######################################
         # plot weight
-        source = ColumnDataSource(data=dict(var=x_axis_values, counts=w_avg))
+        source = ColumnDataSource(data=dict(var=x_indices, counts=w_avg))
         r_w = p.vbar(
             x="var",
             top="counts",
@@ -722,14 +751,17 @@ class Bokeh_plot(Plot_interface):
                         merged_shap_points["shap@" + model_id] / avg_shap_base
                     ).values
 
+                    # Add random jitter to categorical indices (avoids Bokeh jitter() bug)
+                    x_vals = merged_shap_points["x_axis"].values
+                    x_jittered = np.array([x_map.get(str(v), 0) for v in x_vals]) + np.random.uniform(-0.25, 0.25, len(x_vals))
                     source = ColumnDataSource(
                         data=dict(
-                            var=merged_shap_points["x_axis"].values,
+                            var=x_jittered,
                             shap=merged_shap_points["shap@" + model_id].values,
                         )
                     )
                     r_shap = p.circle(
-                        x=jitter("var", width=0.5, range=p.x_range),
+                        x="var",
                         y="shap",
                         source=source,
                         size=2,
@@ -760,7 +792,7 @@ class Bokeh_plot(Plot_interface):
                     lower = min(lower, np.nanmin(avg / avgbase))
                     upper = max(upper, np.nanmax(avg / avgbase))
                     source = ColumnDataSource(
-                        data=dict(var=x_axis_values, y=avg / avgbase)
+                        data=dict(var=x_indices, y=avg / avgbase)
                     )
                     r_avg = p.line(
                         x="var",
