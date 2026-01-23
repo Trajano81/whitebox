@@ -107,7 +107,7 @@ class Data_prep:
         glm_data_to_plot = None
         if "glm" in kwargs.keys() and kwargs["glm"]:
             if kwargs["glmindic_cols"] is None:
-                # Check if emblem model is is available.
+                # Check if emblem model is available.
                 if self.mintypython.emb_mdl != None:
                     # If the GLM vars are different than GBM but they are linked check if a variable map existis and variable is in the map and uses the glm variable to summarize shap.
                     if self.mintypython.emb_gbm_map != None:
@@ -125,11 +125,17 @@ class Data_prep:
                             + str(self.mintypython.emb_mdl.keys())
                         )
                         kwargs["glm"] = False
+                elif self.mintypython.glm_df is not None:
+                    # Auto-use var_name as glmindic_cols when glm_df is provided
+                    kwargs["glmindic_cols"] = [var_name]
                 else:
                     print(
                         "No GLM model to display, if you want to display model relativities, provide a model export emb_model_export on the mintypython construction"
                     )
-            else:
+                    kwargs["glm"] = False
+
+            # Process glmindic_cols (handles both explicit and auto-set cases)
+            if kwargs["glmindic_cols"] is not None:
                 glm_data_to_plot_pts = self.mintypython.glm_df[
                     kwargs["glmindic_cols"]
                 ].prod(axis=1)
