@@ -145,6 +145,7 @@ class mintypython:
 
         self.fac_mapping = None
         self.scorepyon_str = scorepyon_str
+        self.emb_mdl = None  # Initialize to None, will be set if emb_model_export is provided
         self.config = {
             "labels": {
                 "glm": "GLM indication",
