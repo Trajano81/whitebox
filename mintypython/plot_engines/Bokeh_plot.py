@@ -61,10 +61,13 @@ class Bokeh_plot(Plot_interface):
                 if kwargs["base"] in x_axis_values:
                     base = np.argmax(x_axis_values == kwargs["base"])
                 else:
+                    sample_values = x_axis_values[:3] if len(x_axis_values) > 3 else x_axis_values
                     print(
-                        "Warning: The base level you selected is not in:"
-                        + str(x_axis_values)
+                        "Warning: The base level you selected is not in the data. "
+                        + "dtype: " + str(x_axis_values.dtype) + ", "
+                        + "sample values: " + str(list(sample_values))
                     )
+                    base = np.argmax(w_avg)
 
         # create a new plot with numeric x-range
         p = figure(
@@ -353,9 +356,13 @@ class Bokeh_plot(Plot_interface):
             if base in x1_levels:
                 base = np.argmax(x1_levels == base)
             else:
+                sample_values = x1_levels[:3] if len(x1_levels) > 3 else x1_levels
                 print(
-                    "Warning: The base level you selected is not in:" + str(x1_levels)
+                    "Warning: The base level you selected is not in the data. "
+                    + "dtype: " + str(x1_levels.dtype) + ", "
+                    + "sample values: " + str(list(sample_values))
                 )
+                base = np.argmax(w_avg)
 
         # hover tips
         T = [("Name", "$name"), ("X", "@var"), ("Value", "$y")]
@@ -672,10 +679,13 @@ class Bokeh_plot(Plot_interface):
                 if kwargs["base"] in x_axis_values:
                     base = np.argmax(x_axis_values == kwargs["base"])
                 else:
+                    sample_values = x_axis_values[:3] if len(x_axis_values) > 3 else x_axis_values
                     print(
-                        "Warning: The base level you selected is not in:"
-                        + str(x_axis_values)
+                        "Warning: The base level you selected is not in the data. "
+                        + "dtype: " + str(x_axis_values.dtype) + ", "
+                        + "sample values: " + str(list(sample_values))
                     )
+                    base = np.argmax(w_avg)
 
         # create a new plot with numeric x-range
         p = figure(
