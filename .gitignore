@@ -57,3 +57,6 @@ logs/
 
 # Demo artifacts
 demo/*.html
+
+# Claude Code
+CLAUDE.md
