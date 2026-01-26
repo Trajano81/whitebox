@@ -247,18 +247,22 @@ class Data_prep:
                 / data_to_plot_agg["weight"]
             )
 
-        # Apply fac_mapping only if x_axis contains numeric codes that need mapping
-        # Skip if x_axis already contains string labels (no mapping needed)
+        # Apply fac_mapping to show labels with encoded values: "Label(code)"
         if self.mintypython.fac_mapping != None and group_by_var in self.mintypython.fac_mapping:
-            x_axis_dtype = data_to_plot["x_axis"].dtype
-            # Only map if x_axis is numeric (int/float) - string values don't need mapping
-            if pd.api.types.is_numeric_dtype(x_axis_dtype):
-                data_to_plot["x_axis"] = data_to_plot["x_axis"].map(
-                    self.mintypython.fac_mapping[group_by_var]
-                )
-                data_to_plot_agg.index = pd.Series(data_to_plot_agg.index).map(
-                    self.mintypython.fac_mapping[group_by_var]
-                )
+            mapping = self.mintypython.fac_mapping[group_by_var]
+            # Create combined label: "Label(code)" supporting both numeric codes and string labels
+            combined_mapping = {}
+            for code, label in mapping.items():
+                combined_label = f"{label}({code})"
+                combined_mapping[code] = combined_label        # numeric code (0, 1, 2)
+                combined_mapping[str(code)] = combined_label  # string code ("0", "1", "2")
+                combined_mapping[label] = combined_label      # string label ("North", "South")
+            data_to_plot["x_axis"] = data_to_plot["x_axis"].map(
+                lambda x: combined_mapping.get(x, str(x))
+            )
+            data_to_plot_agg.index = pd.Series(data_to_plot_agg.index).map(
+                lambda x: combined_mapping.get(x, str(x))
+            )
 
         if "actuals" in kwargs.keys() and kwargs["actuals"]:
             if self.mintypython.actuals_col is None:
@@ -590,19 +594,18 @@ class Data_prep:
             banded_var = self.mintypython.data[group_by_var]
 
         # Apply fac_mapping to show labels with encoded values: "Label(code)"
-        # Only apply if banded_var contains numeric codes (not already string labels)
         if (
             self.mintypython.fac_mapping is not None
             and group_by_var in self.mintypython.fac_mapping
-            and pd.api.types.is_numeric_dtype(banded_var)
         ):
             mapping = self.mintypython.fac_mapping[group_by_var]
-            # Create combined label: "Label(code)" with both int and str keys
+            # Create combined label: "Label(code)" supporting both numeric codes and string labels
             combined_mapping = {}
             for code, label in mapping.items():
                 combined_label = f"{label}({code})"
-                combined_mapping[code] = combined_label
-                combined_mapping[str(code)] = combined_label
+                combined_mapping[code] = combined_label        # numeric code (0, 1, 2)
+                combined_mapping[str(code)] = combined_label  # string code ("0", "1", "2")
+                combined_mapping[label] = combined_label      # string label ("North", "South")
             banded_var = banded_var.map(
                 lambda x: combined_mapping.get(x, str(x))
             )
