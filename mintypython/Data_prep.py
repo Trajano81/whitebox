@@ -504,7 +504,7 @@ class Data_prep:
         resp = pd.Series(resp).cat.rename_categories(
             lambda x: str.replace(str(x), "(", "")
         )
-        return resp
+        return resp.astype(str)
     
     def _partial_dependency(self, bst, X, w, f_id, features, N=255):
         """
@@ -589,8 +589,24 @@ class Data_prep:
             # Just get the data
             banded_var = self.mintypython.data[group_by_var]
 
-        return banded_var
-    
+        # Apply fac_mapping to show labels with encoded values: "Label(code)"
+        if (
+            self.mintypython.fac_mapping is not None
+            and group_by_var in self.mintypython.fac_mapping
+        ):
+            mapping = self.mintypython.fac_mapping[group_by_var]
+            # Create combined label: "Label(code)" with both int and str keys
+            combined_mapping = {}
+            for code, label in mapping.items():
+                combined_label = f"{label}({code})"
+                combined_mapping[code] = combined_label
+                combined_mapping[str(code)] = combined_label
+            banded_var = banded_var.map(
+                lambda x: combined_mapping.get(x, str(x))
+            )
+
+        return banded_var.astype(str)
+
     def prep_bivariate_data(
         self,
         var1,

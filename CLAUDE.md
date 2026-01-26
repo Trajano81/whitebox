@@ -62,3 +62,7 @@ Engines are instantiated per-plot and receive prepared data from `Data_prep`.
 - The `config` dict on mintypython controls plot aesthetics (colors, labels, line widths)
 - Variable mappings between GBM and GLM names handled via `emb_gbm_map` parameter
 - SHAP values can be combined across variables using `joinshaps` parameter
+
+## Git Commit Guidelines
+
+- Do NOT include the Claude co-author signature in commits (no `Co-Authored-By: Claude` line)
