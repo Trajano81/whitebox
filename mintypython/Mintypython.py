@@ -735,6 +735,7 @@ class mintypython:
         base=None,
         shap=False,
         shap_points=False,
+        shap_sd=None,
         n_shap_points=1000,
         glm=False,
         glm_pred=False,
@@ -863,6 +864,9 @@ class mintypython:
         kwargs["base"] = base
         kwargs["shap"] = shap
         kwargs["shap_points"] = shap_points
+        if shap_sd is None:
+            shap_sd = shap
+        kwargs["shap_sd"] = shap_sd
         kwargs["n_shap_points"] = n_shap_points
         kwargs["glm"] = glm
         kwargs["glm_pred"] = glm_pred
