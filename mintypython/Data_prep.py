@@ -175,14 +175,6 @@ class Data_prep:
                 / data_to_plot_agg["weight"]
             )
 
-        if self.mintypython.fac_mapping != None and group_by_var in self.mintypython.fac_mapping:
-            data_to_plot["x_axis"] = data_to_plot["x_axis"].map(
-                self.mintypython.fac_mapping[group_by_var]
-            )
-            data_to_plot_agg.index = pd.Series(data_to_plot_agg.index).map(
-                self.mintypython.fac_mapping[group_by_var]
-            )
-
         if "actuals" in kwargs.keys() and kwargs["actuals"]:
             if self.mintypython.actuals_col is None:
                 print(
@@ -681,13 +673,15 @@ class Data_prep:
                 + str(hp[1])
             )
 
-        n = len(mintylist)
+        # Include the calling model (self.mintypython) as the first model
+        all_models = [self.mintypython] + mintylist
+        n = len(all_models)
         plot_data = list()
         agg_data = list()
         shap_points = list()
 
         for i in range(0, n):
-            plot_data += [mintylist[i].Data_prep.prep_univariate_data(var_name, kwargs)]
+            plot_data += [all_models[i].Data_prep.prep_univariate_data(var_name, kwargs)]
             agg_data += [plot_data[i]["agg_data"]]
             shap_points += [plot_data[i]["shap_points"].reset_index(drop=True)]
 
@@ -705,7 +699,7 @@ class Data_prep:
                 columns={c: c + "@" + model_ids[i] for c in agg_data[i].columns}
             )
             merged_data = merged_data.merge(
-                agg_data[i], left_index=True, right_index=True
+                agg_data[i], left_index=True, right_index=True, how='outer'
             )
             if kwargs["shap_points"]:
                 shap_points[i] = shap_points[i].rename(
