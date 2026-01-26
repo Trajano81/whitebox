@@ -771,7 +771,7 @@ class DataPrep:
         shap_points = list()
 
         for i in range(0, n):
-            plot_data += [all_models[i].Data_prep.prep_univariate_data(var_name, kwargs)]
+            plot_data += [all_models[i].DataPrep.prep_univariate_data(var_name, kwargs)]
             agg_data += [plot_data[i]["agg_data"]]
             shap_points += [plot_data[i]["shap_points"].reset_index(drop=True)]
 

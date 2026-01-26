@@ -455,13 +455,13 @@ class Whitebox:
             engine = self.default_engine
 
         if engine == "Bokeh":
-            from .plot_engines.Bokeh_plot import Bokeh_plot
+            from .engines.bokeh_engine import BokehEngine
 
-            plot_engine = Bokeh_plot(self)
+            plot_engine = BokehEngine(self)
         elif engine == "Matplotlib":
-            from .plot_engines.Matplotlib_plot import Matplotlib_plot
+            from .engines.matplotlib_engine import MatplotlibEngine
 
-            plot_engine = Matplotlib_plot(self)
+            plot_engine = MatplotlibEngine(self)
 
         plot = plot_engine.univariate_plot(kwargs, plot_data, var_name)
         return plot
@@ -606,9 +606,9 @@ class Whitebox:
             glmindic_cols,
             joinshaps,
         )
-        from .plot_engines.Bokeh_plot import Bokeh_plot
+        from .engines.bokeh_engine import BokehEngine
 
-        plot_engine = Bokeh_plot(self)
+        plot_engine = BokehEngine(self)
 
         plot = plot_engine.bivariate_plot(
             data_to_plot,
@@ -729,9 +729,9 @@ class Whitebox:
 
     def compare(
         self,
-        mintylist,
+        wblist,
         var_name,
-        mintynames=None,
+        model_names=None,
         base=None,
         shap=False,
         shap_points=False,
@@ -891,18 +891,18 @@ class Whitebox:
         kwargs["rebase"] = rebase
         kwargs["joinshaps"] = joinshaps
         kwargs["glmindic_cols"] = glmindic_cols
-        kwargs["model_ids"] = mintynames
+        kwargs["model_ids"] = model_names
         kwargs["joinshaps_error"] = joinshaps_error
         kwargs["height"] = height
         kwargs["width"] = width
 
         merged_data, merged_shap_points = self.DataPrep.prep_compare_data(
-            var_name, mintylist, **kwargs
+            var_name, wblist, **kwargs
         )
 
-        from .plot_engines.Bokeh_plot import Bokeh_plot
+        from .engines.bokeh_engine import BokehEngine
 
-        plot_engine = Bokeh_plot(self)
+        plot_engine = BokehEngine(self)
 
         plot = plot_engine.compare(var_name, merged_data, merged_shap_points, **kwargs)
         return plot
