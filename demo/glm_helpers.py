@@ -1,8 +1,8 @@
 """
-GLM simulation helpers for MintyPython demo.
+GLM simulation helpers for Whitebox demo.
 
 Since Emblem model exports are proprietary, this module provides simulated
-GLM relativities that demonstrate MintyPython's GLM comparison features.
+GLM relativities that demonstrate Whitebox's GLM comparison features.
 """
 
 import numpy as np
@@ -134,6 +134,10 @@ def get_glm_data_for_mintypython(data, feature_names):
     glm_preds = create_glm_predictions(data, glm_df)
 
     return glm_df, glm_preds
+
+
+# Alias for new naming
+get_glm_data_for_whitebox = get_glm_data_for_mintypython
 
 
 def create_category_mapping_dict(category_mappings):

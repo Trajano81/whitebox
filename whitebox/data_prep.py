@@ -1,17 +1,17 @@
-from .libs import *
+from .utils import *
 import shap
 import os
 import pandas as pd
 from .exceptions import JoinShapNotFoundError
 
 
-class Data_prep:
-    def __init__(self, mintypython):
-        self.mintypython = mintypython
+class DataPrep:
+    def __init__(self, whitebox):
+        self.whitebox = whitebox
 
     def prep_glm_df(self):
-        glm_data = self.mintypython.data
-        mdl_export = self.mintypython.emb_mdl
+        glm_data = self.whitebox.data
+        mdl_export = self.whitebox.emb_mdl
 
         block = glm_data.copy()
         concatenator = "_xOx_"
@@ -55,7 +55,7 @@ class Data_prep:
                         )
                     glm_df[key] = srs.map(val)
 
-        self.mintypython.glm_df = glm_df
+        self.whitebox.glm_df = glm_df
 
     def process_categoricals(self, columns=None):
         """
@@ -82,45 +82,45 @@ class Data_prep:
             Updated category_mappings {column: {code: label}}
         """
         if columns is None:
-            columns = self.mintypython.feature_names
+            columns = self.whitebox.feature_names
 
         processed_columns = []
         for col in columns:
-            if col not in self.mintypython.data.columns:
+            if col not in self.whitebox.data.columns:
                 continue
 
-            col_dtype = self.mintypython.data[col].dtype
+            col_dtype = self.whitebox.data[col].dtype
             encoded_col = f'{col}_encoded'
-            has_encoded = encoded_col in self.mintypython.data.columns
-            has_mapping = col in self.mintypython.category_mappings
+            has_encoded = encoded_col in self.whitebox.data.columns
+            has_mapping = col in self.whitebox.category_mappings
 
             # Scenario 3: Has _encoded column already - reconstruct mapping from pair
             if has_encoded:
                 if not has_mapping:
-                    unique_pairs = self.mintypython.data[[col, encoded_col]].drop_duplicates()
-                    self.mintypython.category_mappings[col] = dict(
+                    unique_pairs = self.whitebox.data[[col, encoded_col]].drop_duplicates()
+                    self.whitebox.category_mappings[col] = dict(
                         zip(unique_pairs[encoded_col], unique_pairs[col])
                     )
                 processed_columns.append(col)
 
             # Scenario 2: Object column WITH mapping - create encoded
             elif col_dtype == 'object' and has_mapping:
-                label_to_code = {v: k for k, v in self.mintypython.category_mappings[col].items()}
-                self.mintypython.data[encoded_col] = self.mintypython.data[col].map(label_to_code)
+                label_to_code = {v: k for k, v in self.whitebox.category_mappings[col].items()}
+                self.whitebox.data[encoded_col] = self.whitebox.data[col].map(label_to_code)
                 processed_columns.append(col)
 
             # Scenario 1: Object column WITHOUT mapping - warn and skip
             elif col_dtype == 'object' and not has_mapping:
-                if self.mintypython.verbose:
+                if self.whitebox.verbose:
                     print(f"Warning: '{col}' is object type but no category_mappings provided. "
                           f"Cannot encode without mapping from training.")
 
             # Scenario 4: Numerical/int columns - skip silently
 
-        if self.mintypython.verbose and processed_columns:
+        if self.whitebox.verbose and processed_columns:
             print(f"Processed {len(processed_columns)} categorical column(s): {processed_columns}")
 
-        return self.mintypython.category_mappings
+        return self.whitebox.category_mappings
 
     def prep_shap_values(self, out_file=""):
         """
@@ -129,39 +129,39 @@ class Data_prep:
         the shapley values and save as out_file
         """
         # computing shapley values
-        self.mintypython.explainer = shap.TreeExplainer(self.mintypython.model)
+        self.whitebox.explainer = shap.TreeExplainer(self.whitebox.model)
 
         if os.path.exists(out_file) == False:
             # Build feature data for SHAP, using _encoded columns where available
             shap_data = pd.DataFrame()
-            for col in self.mintypython.feature_names:
+            for col in self.whitebox.feature_names:
                 encoded_col = f'{col}_encoded'
-                if encoded_col in self.mintypython.data.columns:
-                    shap_data[col] = self.mintypython.data[encoded_col]  # Use encoded
+                if encoded_col in self.whitebox.data.columns:
+                    shap_data[col] = self.whitebox.data[encoded_col]  # Use encoded
                 else:
-                    shap_data[col] = self.mintypython.data[col]  # Use original
+                    shap_data[col] = self.whitebox.data[col]  # Use original
 
-            shap_values = self.mintypython.explainer.shap_values(shap_data)
-            shap_values = self.mintypython.link_fn(shap_values)
-            self.mintypython.shap_df = pd.DataFrame(
+            shap_values = self.whitebox.explainer.shap_values(shap_data)
+            shap_values = self.whitebox.link_fn(shap_values)
+            self.whitebox.shap_df = pd.DataFrame(
                 shap_values,
-                columns=self.mintypython.feature_names,  # Keep original names
+                columns=self.whitebox.feature_names,  # Keep original names
                 index=shap_data.index,
             )
             if out_file != "":
-                self.mintypython.shap_df.to_pickle(out_file)
-                if self.mintypython.verbose:
+                self.whitebox.shap_df.to_pickle(out_file)
+                if self.whitebox.verbose:
                     print("Shapley values for all features saved to :" + out_file)
         else:
             print("Reading shapley from:" + out_file)
-            self.mintypython.shap_df = pd.read_pickle(out_file)
+            self.whitebox.shap_df = pd.read_pickle(out_file)
     
     def prep_univariate_data(self, var_name, kwargs):
         """
         Creates univariate data to plot
         """
         if kwargs["shap"] is not None and (
-            var_name not in self.mintypython.feature_names
+            var_name not in self.whitebox.feature_names
             and kwargs["joinshaps"] is None
             and kwargs["shap"]
         ):
@@ -169,7 +169,7 @@ class Data_prep:
                 "The variable "
                 + var_name
                 + " is not in the model to plot shaps, the availables variables are:"
-                + str(self.mintypython.feature_names)
+                + str(self.whitebox.feature_names)
             )
         shap_data = pd.DataFrame()
         data_to_plot = pd.DataFrame()
@@ -180,41 +180,41 @@ class Data_prep:
         if "glm" in kwargs.keys() and kwargs["glm"]:
             if kwargs["glmindic_cols"] is None:
                 # Check if emblem model is available.
-                if self.mintypython.emb_mdl != None:
+                if self.whitebox.emb_mdl != None:
                     # If the GLM vars are different than GBM but they are linked check if a variable map existis and variable is in the map and uses the glm variable to summarize shap.
-                    if self.mintypython.emb_gbm_map != None:
-                        if var_name in self.mintypython.emb_gbm_map.keys():
-                            group_by_var = self.mintypython.emb_gbm_map[var_name]
+                    if self.whitebox.emb_gbm_map != None:
+                        if var_name in self.whitebox.emb_gbm_map.keys():
+                            group_by_var = self.whitebox.emb_gbm_map[var_name]
                     # Check if var is in the glm
-                    if group_by_var in self.mintypython.emb_mdl.keys():
-                        # glm_data_to_plot=dict((k, self.mintypython.link_fn(v)) for k, v in self.mintypython.emb_mdl[group_by_var].items())
-                        glm_data_to_plot = self.mintypython.emb_mdl[group_by_var]
+                    if group_by_var in self.whitebox.emb_mdl.keys():
+                        # glm_data_to_plot=dict((k, self.whitebox.link_fn(v)) for k, v in self.whitebox.emb_mdl[group_by_var].items())
+                        glm_data_to_plot = self.whitebox.emb_mdl[group_by_var]
                     else:
                         print(
                             "The variable "
                             + group_by_var
                             + "is not in the GLM model, if the variable is in the GLM but with a different name, use the parameter emb_gbm_map to map the variables the variable in the glm are:"
-                            + str(self.mintypython.emb_mdl.keys())
+                            + str(self.whitebox.emb_mdl.keys())
                         )
                         kwargs["glm"] = False
-                elif self.mintypython.glm_df is not None:
+                elif self.whitebox.glm_df is not None:
                     # Auto-use var_name as glmindic_cols when glm_df is provided
                     kwargs["glmindic_cols"] = [var_name]
                 else:
                     print(
-                        "No GLM model to display, if you want to display model relativities, provide a model export emb_model_export on the mintypython construction"
+                        "No GLM model to display, if you want to display model relativities, provide a model export emb_model_export on the Whitebox construction"
                     )
                     kwargs["glm"] = False
 
             # Process glmindic_cols (handles both explicit and auto-set cases)
             if kwargs["glmindic_cols"] is not None:
-                glm_data_to_plot_pts = self.mintypython.glm_df[
+                glm_data_to_plot_pts = self.whitebox.glm_df[
                     kwargs["glmindic_cols"]
                 ].prod(axis=1)
                 data_to_plot["glm"] = glm_data_to_plot_pts
                 data_to_plot["glm_wtg"] = (
                     glm_data_to_plot_pts
-                    * self.mintypython.data[self.mintypython.weight_col]
+                    * self.whitebox.data[self.whitebox.weight_col]
                 )
 
         data_to_plot["x_axis"] = self._bin_if_numeric(
@@ -230,7 +230,7 @@ class Data_prep:
             glm_data_to_plot=glm_data_to_plot,
         )
 
-        data_to_plot["weight"] = self.mintypython.data[self.mintypython.weight_col]
+        data_to_plot["weight"] = self.whitebox.data[self.whitebox.weight_col]
 
         data_to_plot_agg["weight"] = data_to_plot.groupby("x_axis", dropna=False)[
             "weight"
@@ -248,8 +248,8 @@ class Data_prep:
             )
 
         # Apply fac_mapping to show labels with encoded values: "Label(code)"
-        if self.mintypython.fac_mapping != None and group_by_var in self.mintypython.fac_mapping:
-            mapping = self.mintypython.fac_mapping[group_by_var]
+        if self.whitebox.fac_mapping != None and group_by_var in self.whitebox.fac_mapping:
+            mapping = self.whitebox.fac_mapping[group_by_var]
             # Create combined label: "Label(code)" supporting both numeric codes and string labels
             combined_mapping = {}
             for code, label in mapping.items():
@@ -265,14 +265,14 @@ class Data_prep:
             )
 
         if "actuals" in kwargs.keys() and kwargs["actuals"]:
-            if self.mintypython.actuals_col is None:
+            if self.whitebox.actuals_col is None:
                 print(
-                    "If you want to plot actuals you must provide a actuals_col in the mintypython call e.g mintypython(actuals_col='your actuals column')"
+                    "If you want to plot actuals you must provide a actuals_col in the Whitebox call e.g Whitebox(actuals_col='your actuals column')"
                 )
                 kwargs["actuals"] = False
             else:
-                data_to_plot["actuals"] = self.mintypython.data[
-                    self.mintypython.actuals_col
+                data_to_plot["actuals"] = self.whitebox.data[
+                    self.whitebox.actuals_col
                 ]
                 data_to_plot_agg["actuals"] = (
                     data_to_plot.groupby("x_axis", dropna=False)["actuals"].sum()
@@ -285,17 +285,17 @@ class Data_prep:
             or ("shap_points" in kwargs.keys() and kwargs["shap_points"])
             or ("shap_sd" in kwargs.keys() and kwargs["shap_sd"])
         ):
-            if self.mintypython.shap_df is None:
+            if self.whitebox.shap_df is None:
                 self.prep_shap_values()
             # weighted shap
             if kwargs["joinshaps"] is None or len(kwargs["joinshaps"]) == 0:
-                shap_vals = self.mintypython.shap_df[var_name].values
+                shap_vals = self.whitebox.shap_df[var_name].values
             else:
                 valid_shaps = self.get_valid_shaps(kwargs["joinshaps"])
-                shap_vals = self.mintypython.shap_df[valid_shaps].prod(axis=1).values
+                shap_vals = self.whitebox.shap_df[valid_shaps].prod(axis=1).values
 
             data_to_plot["shap_wtg"] = (
-                shap_vals * self.mintypython.data[self.mintypython.weight_col].values
+                shap_vals * self.whitebox.data[self.whitebox.weight_col].values
             )
 
             data_to_plot_agg["shap"] = (
@@ -306,7 +306,7 @@ class Data_prep:
                 data_to_plot["shap2_wtg"] = (
                     shap_vals
                     * shap_vals
-                    * self.mintypython.data[self.mintypython.weight_col].values
+                    * self.whitebox.data[self.whitebox.weight_col].values
                 )
                 data_to_plot_agg["shap_sd"] = np.sqrt(
                     data_to_plot.groupby("x_axis", dropna=False)["shap2_wtg"].sum()
@@ -325,39 +325,39 @@ class Data_prep:
             shap_data = data_to_plot.loc[plot_index, ["shap", "x_axis"]]
         
         if "glm_pred" in kwargs.keys() and kwargs["glm_pred"]:
-            if self.mintypython.glm_preds_col is None:
+            if self.whitebox.glm_preds_col is None:
                 # If the prediction were already calculated donot calculate again
-                if self.mintypython._glm_predictions is None:
+                if self.whitebox._glm_predictions is None:
                     # Scorepyon
-                    scr_data = self.mintypython.data.copy()
+                    scr_data = self.whitebox.data.copy()
                     for col in scr_data:
                         if str(scr_data[col].dtype) == "category":
                             scr_data[col] = scr_data[col].astype(str)
-                    nm = self.mintypython.emb_model_export.split("/")
+                    nm = self.whitebox.emb_model_export.split("/")
                     model_name = nm[len(nm) - 1].split(".")[0]
-                    if self.mintypython.scorepyon_str:
+                    if self.whitebox.scorepyon_str:
                         for col in scr_data:
                             scr_data[col] = scr_data[col].astype(str)
-                    if self.mintypython._scorepyon_link_fn == "ERROR":
+                    if self.whitebox._scorepyon_link_fn == "ERROR":
                         raise ValueError(
                             "You must provide a link_fn on the class construction to score a glm"
                         )
-                    if self.mintypython.rename_glm != None:
-                        inv_map = {v: k for k, v in self.mintypython.rename_glm.items()}
+                    if self.whitebox.rename_glm != None:
+                        inv_map = {v: k for k, v in self.whitebox.rename_glm.items()}
                         scr_data = scr_data.rename(columns=inv_map)
-                    self.mintypython._glm_predictions = scp.score_frame(
+                    self.whitebox._glm_predictions = scp.score_frame(
                         scr_data,
-                        self.mintypython.emb_model_export,
-                        link_fn=self.mintypython._scorepyon_link_fn,
-                        use_labels=self.mintypython.use_labels,
+                        self.whitebox.emb_model_export,
+                        link_fn=self.whitebox._scorepyon_link_fn,
+                        use_labels=self.whitebox.use_labels,
                         reduce_mem=True,
                     )[model_name]
                 data_to_plot["glm_pred_wgt"] = (
-                    self.mintypython._glm_predictions * data_to_plot["weight"]
+                    self.whitebox._glm_predictions * data_to_plot["weight"]
                 )
             else:
                 data_to_plot["glm_pred_wgt"] = (
-                    self.mintypython.data[self.mintypython.glm_preds_col]
+                    self.whitebox.data[self.whitebox.glm_preds_col]
                     * data_to_plot["weight"]
                 )
 
@@ -370,11 +370,11 @@ class Data_prep:
 
             if "glm_ci" in kwargs.keys() and kwargs["glm_ci"]:
                 if (
-                    self.mintypython.scale_parameter is not None
-                    and self.mintypython._ci_fn is not None
+                    self.whitebox.scale_parameter is not None
+                    and self.whitebox._ci_fn is not None
                 ):
                     data_to_plot_agg["stdev"] = np.sqrt(
-                        self.mintypython._ci_fn(
+                        self.whitebox._ci_fn(
                             data_to_plot_agg["glm_pred"],
                             data_to_plot_agg["weight"],
                         )
@@ -395,12 +395,12 @@ class Data_prep:
                     )
         if "gbm_pred" in kwargs.keys():
             # If the prediction were already calculated donot calculate again
-            if self.mintypython._gbm_predictions is None:
-                self.mintypython._gbm_predictions = self.mintypython.model.predict(
-                    self.mintypython.x_data
+            if self.whitebox._gbm_predictions is None:
+                self.whitebox._gbm_predictions = self.whitebox.model.predict(
+                    self.whitebox.x_data
                 )
             data_to_plot["gbm_pred_wgt"] = (
-                self.mintypython._gbm_predictions * data_to_plot["weight"].values
+                self.whitebox._gbm_predictions * data_to_plot["weight"].values
             )
             data_to_plot_agg["gbm_pred_wgt"] = data_to_plot.groupby(
                 "x_axis", dropna=False
@@ -543,7 +543,7 @@ class Data_prep:
 
         for i, val in enumerate(grid):
             X_temp.iloc[:, f_id] = val
-            data = self.mintypython.xgb.DMatrix(X_temp, feature_names=features)
+            data = self.whitebox.xgb.DMatrix(X_temp, feature_names=features)
             y_pred[i] = np.sum(bst.predict(data, output_margin=False) * w) / w.sum()
 
         return grid, y_pred
@@ -564,14 +564,14 @@ class Data_prep:
         banded_var = None
         # Identify if the variable is numeric or categorical.
         # Check variable type to decide if we need to create bandings or not.
-        if pd.api.types.is_numeric_dtype(self.mintypython.data[group_by_var]):
-            nlevels = len(self.mintypython.data[group_by_var].unique())
+        if pd.api.types.is_numeric_dtype(self.whitebox.data[group_by_var]):
+            nlevels = len(self.whitebox.data[group_by_var].unique())
             if (nlevels > 200 and glm_data_to_plot == None) or (
                 nlevel != None or start != None or finish != None or stepsize != None
             ):
                 # if is numeric and has a lot of levels bin it
                 banded_var = self.create_bandings(
-                    self.mintypython.data[group_by_var],
+                    self.whitebox.data[group_by_var],
                     nlevels=nlevel,
                     start=start,
                     finish=finish,
@@ -582,23 +582,23 @@ class Data_prep:
                     infinity_lower=infinity_lower,
                 )
             else:
-                banded_var = self.mintypython.data[group_by_var]
+                banded_var = self.whitebox.data[group_by_var]
         elif (
-            pd.api.types.is_categorical_dtype(self.mintypython.data[group_by_var])
-            and not self.mintypython.data[group_by_var].cat.ordered
+            pd.api.types.is_categorical_dtype(self.whitebox.data[group_by_var])
+            and not self.whitebox.data[group_by_var].cat.ordered
         ):
             # if is category gets the category name
-            banded_var = self.mintypython.data[group_by_var].astype(str)
+            banded_var = self.whitebox.data[group_by_var].astype(str)
         else:
             # Just get the data
-            banded_var = self.mintypython.data[group_by_var]
+            banded_var = self.whitebox.data[group_by_var]
 
         # Apply fac_mapping to show labels with encoded values: "Label(code)"
         if (
-            self.mintypython.fac_mapping is not None
-            and group_by_var in self.mintypython.fac_mapping
+            self.whitebox.fac_mapping is not None
+            and group_by_var in self.whitebox.fac_mapping
         ):
-            mapping = self.mintypython.fac_mapping[group_by_var]
+            mapping = self.whitebox.fac_mapping[group_by_var]
             # Create combined label: "Label(code)" supporting both numeric codes and string labels
             combined_mapping = {}
             for code, label in mapping.items():
@@ -641,19 +641,19 @@ class Data_prep:
         glmindic_cols=None,
         joinshaps=None,
     ):
-        if var1 not in self.mintypython.feature_names:
+        if var1 not in self.whitebox.feature_names:
             raise ValueError(
                 "The variable "
                 + var1
                 + " is not in the model the availables variables are "
-                + str(self.mintypython.feature_names)
+                + str(self.whitebox.feature_names)
             )
-        if var2 not in self.mintypython.feature_names:
+        if var2 not in self.whitebox.feature_names:
             raise ValueError(
                 "The variable "
                 + var2
                 + " is not in the model the availables variables are "
-                + str(self.mintypython.feature_names)
+                + str(self.whitebox.feature_names)
             )
 
         data_to_plot = pd.DataFrame()
@@ -677,45 +677,45 @@ class Data_prep:
             percentile_finish_var2,
         )
 
-        data_to_plot["weight"] = self.mintypython.data[self.mintypython.weight_col]
+        data_to_plot["weight"] = self.whitebox.data[self.whitebox.weight_col]
 
         data_to_plot = data_to_plot.reset_index()
 
         if shap:
-            if self.mintypython.shap_df is None:
+            if self.whitebox.shap_df is None:
                 self.prep_shap_values()
             if joinshaps is not None:
                 data_to_plot["shap"] = (
-                    self.mintypython.shap_df[joinshaps]
+                    self.whitebox.shap_df[joinshaps]
                     .prod(axis=1)
                     .reset_index(drop=True)
                 )
                 data_to_plot["shap_wgt"] = (
-                    self.mintypython.shap_df[joinshaps].prod(axis=1)
+                    self.whitebox.shap_df[joinshaps].prod(axis=1)
                     * data_to_plot["weight"]
                 ).reset_index(drop=True)
             else:
-                data_to_plot["shap"] = self.mintypython.shap_df[var1].reset_index(
+                data_to_plot["shap"] = self.whitebox.shap_df[var1].reset_index(
                     drop=True
                 )
                 data_to_plot["shap_wgt"] = (
-                    self.mintypython.shap_df[var1] * data_to_plot["weight"]
+                    self.whitebox.shap_df[var1] * data_to_plot["weight"]
                 ).reset_index(drop=True)
         
         if glm:
             if glmindic_cols is not None:
                 data_to_plot["glm_wgt"] = (
-                    self.mintypython.glm_df[glmindic_cols].prod(axis=1)
+                    self.whitebox.glm_df[glmindic_cols].prod(axis=1)
                     * data_to_plot["weight"]
                 ).reset_index(drop=True)
             else:
                 data_to_plot["glm_wgt"] = (
-                    self.mintypython.glm_df[var1] * data_to_plot["weight"]
+                    self.whitebox.glm_df[var1] * data_to_plot["weight"]
                 ).reset_index(drop=True)
 
         if actuals:
             act = pd.DataFrame(
-                self.mintypython.data[self.mintypython.actuals_col]
+                self.whitebox.data[self.whitebox.actuals_col]
             ).reset_index(drop=True)
             data_to_plot["actuals"] = act
 
@@ -737,12 +737,12 @@ class Data_prep:
 
         if gbm_pred:
             # If the prediction were already calculated donot calculate again
-            if self.mintypython._gbm_predictions is None:
-                self.mintypython._gbm_predictions = self.mintypython.model.predict(
-                    self.mintypython.x_data
+            if self.whitebox._gbm_predictions is None:
+                self.whitebox._gbm_predictions = self.whitebox.model.predict(
+                    self.whitebox.x_data
                 )
             data_to_plot["gbm_pred_wgt"] = (
-                self.mintypython._gbm_predictions * data_to_plot["weight"]
+                self.whitebox._gbm_predictions * data_to_plot["weight"]
             )
             data_to_plot_agg["gbm_pred_wgt"] = data_to_plot.groupby(
                 ["var1", "var2"], dropna=False
@@ -763,8 +763,8 @@ class Data_prep:
                 + str(hp[1])
             )
 
-        # Include the calling model (self.mintypython) as the first model
-        all_models = [self.mintypython] + mintylist
+        # Include the calling model (self.whitebox) as the first model
+        all_models = [self.whitebox] + mintylist
         n = len(all_models)
         plot_data = list()
         agg_data = list()
@@ -775,7 +775,7 @@ class Data_prep:
             agg_data += [plot_data[i]["agg_data"]]
             shap_points += [plot_data[i]["shap_points"].reset_index(drop=True)]
 
-        # Merge data from mintypython objects
+        # Merge data from Whitebox objects
         merged_data = agg_data[0].copy()
         merged_data.columns = [col + "@" + model_ids[0] for col in merged_data.columns]
         merged_shap_points = shap_points[0].copy()
@@ -807,7 +807,7 @@ class Data_prep:
         return merged_data, merged_shap_points
 
     def get_valid_shaps(self, joinshaps):
-        valid_shaps = set(joinshaps).intersection(set(self.mintypython.shap_df.columns))
+        valid_shaps = set(joinshaps).intersection(set(self.whitebox.shap_df.columns))
 
         if len(valid_shaps) < len(joinshaps):
             missing = set(joinshaps) - valid_shaps

@@ -1,21 +1,59 @@
-*.egg-info
-
-# Demo artifacts - synthetic data and generated files
-demo/synthetic_data.csv
-demo/synthetic_data.pkl
-demo/*.pkl
-demo/*.html
-
-# Jupyter checkpoints
-.ipynb_checkpoints/
-demo/.ipynb_checkpoints/
-
-# Python cache
-__pycache__/
-*.pyc
-*.pyo
-
 # Virtual environments
-mintypython-demo-env/
 venv/
 .venv/
+env/
+.env/
+whitebox-demo-env/
+
+# Poetry
+poetry.lock
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg
+*.egg-info/
+dist/
+build/
+
+# Jupyter
+.ipynb_checkpoints/
+*/.ipynb_checkpoints/
+
+# Data files (datasets)
+*.csv
+*.parquet
+*.pkl
+*.pickle
+*.h5
+*.hdf5
+data/
+datasets/
+
+# Model files
+*.model
+*.xgb
+*.lgb
+*.joblib
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Logs
+*.log
+logs/
+
+# Demo artifacts
+demo/*.html

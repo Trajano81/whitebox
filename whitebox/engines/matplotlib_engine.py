@@ -1,13 +1,13 @@
-from .Plot_interface import Plot_interface
-from ..libs import *
+from .base import PlotEngine
+from ..utils import *
 from matplotlib import pyplot as plt
 import seaborn as sns
 from collections import OrderedDict
 
 
-class Matplotlib_plot(Plot_interface):
-    def __init__(self, mintypython):
-        self.mintypython = mintypython
+class MatplotlibEngine(PlotEngine):
+    def __init__(self, whitebox):
+        self.whitebox = whitebox
         pass
 
     def univariate_plot(self, kwargs, plot_data, var_name):
@@ -42,12 +42,12 @@ class Matplotlib_plot(Plot_interface):
                         + str(x_axis_values)
                     )
 
-        # ax2.bar(x_axis_values,w_avg,label=self.mintypython.config["labels"]["weight"], color=self.mintypython.config["colors"]["weight"])
+        # ax2.bar(x_axis_values,w_avg,label=self.whitebox.config["labels"]["weight"], color=self.whitebox.config["colors"]["weight"])
         sns.barplot(
             x=x_axis_values,
             y=w_avg,
-            label=self.mintypython.config["labels"]["weight"],
-            color=self.mintypython.config["colors"]["weight"],
+            label=self.whitebox.config["labels"]["weight"],
+            color=self.whitebox.config["colors"]["weight"],
             ax=ax2,
         )
 
@@ -70,9 +70,9 @@ class Matplotlib_plot(Plot_interface):
             #               y = np.concatenate((np.ones_like(x_axis_values),plot_data["shap_points"]["shap"].values)),
             #               ax = ax,
             #               # size=3,
-            #               label=self.mintypython.config["labels"]["shap_points"],
+            #               label=self.whitebox.config["labels"]["shap_points"],
             #               jitter=0.20,
-            #               color=self.mintypython.config["colors"]["shap_points"],
+            #               color=self.whitebox.config["colors"]["shap_points"],
             #               size = np.concatenate((np.zeros_like(x_axis_values,dtype=float),np.ones_like(x_shap.values,dtype=float))),
             #               alpha = 0.5)
             sns.stripplot(
@@ -80,9 +80,9 @@ class Matplotlib_plot(Plot_interface):
                 y=plot_data["shap_points"]["shap"].values,
                 order=x_axis_values,
                 ax=ax,
-                label=self.mintypython.config["labels"]["shap_points"],
+                label=self.whitebox.config["labels"]["shap_points"],
                 jitter=0.20,
-                color=self.mintypython.config["colors"]["shap_points"],
+                color=self.whitebox.config["colors"]["shap_points"],
                 size=3,
             )
 
@@ -101,10 +101,10 @@ class Matplotlib_plot(Plot_interface):
                 avg_shap / avgbase,
                 yerr=shap_sd / avgbase,
                 linewidth=0,
-                ecolor=self.mintypython.config["colors"]["shap_sd"],
+                ecolor=self.whitebox.config["colors"]["shap_sd"],
                 alpha=0.3,
-                elinewidth=self.mintypython.config["line_width"]["shap_sd"] * 5,
-                label=self.mintypython.config["labels"]["shap_sd"],
+                elinewidth=self.whitebox.config["line_width"]["shap_sd"] * 5,
+                label=self.whitebox.config["labels"]["shap_sd"],
             )
 
         for line in ["shap", "glm", "actuals", "glm_pred", "gbm_pred"]:
@@ -121,18 +121,18 @@ class Matplotlib_plot(Plot_interface):
                 lower = min(lower, min(avg / avgbase))
                 upper = max(upper, max(avg / avgbase))
                 # ax.plot(x_axis_values, avg / avgbase,
-                #     linewidth=self.mintypython.config["line_width"][line],
-                #     label=self.mintypython.config["labels"][line],
-                #     color=self.mintypython.config["colors"][line],
-                #     marker=self.mintypython.config["marker"][line]
+                #     linewidth=self.whitebox.config["line_width"][line],
+                #     label=self.whitebox.config["labels"][line],
+                #     color=self.whitebox.config["colors"][line],
+                #     marker=self.whitebox.config["marker"][line]
                 # )
                 sns.lineplot(
                     x=x_axis_values,
                     y=avg / avgbase,
-                    linewidth=self.mintypython.config["line_width"][line],
-                    label=self.mintypython.config["labels"][line],
-                    color=self.mintypython.config["colors"][line],
-                    marker=self.mintypython.config["marker"][line],
+                    linewidth=self.whitebox.config["line_width"][line],
+                    label=self.whitebox.config["labels"][line],
+                    color=self.whitebox.config["colors"][line],
+                    marker=self.whitebox.config["marker"][line],
                     ax=ax,
                 )
 

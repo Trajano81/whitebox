@@ -1,0 +1,50 @@
+[project]
+name = "whitebox"
+version = "1.0.0"
+description = "Model-agnostic visualization library for interpreting ML models"
+readme = "README.md"
+license = "MIT"
+authors = [
+    {name = "Kmilo Aparicio", email = "kmilo.aparicio@gmail.com"}
+]
+keywords = ["machine-learning", "visualization", "shap", "model-interpretation"]
+requires-python = ">=3.9"
+dependencies = [
+    "numpy>=1.24",
+    "pandas>=2.0",
+    "scikit-learn>=1.3",
+    "xgboost>=2.0",
+    "shap>=0.44",
+    "bokeh>=3.0.3,<3.3",
+    "pyarrow>=14.0",
+    "matplotlib>=3.7",
+    "seaborn>=0.13",
+    "deepdiff>=6.0",
+    "ipython>=8.0",
+    "scorepyon @ git+https://github.com/Trajano81/scoring_pricing.git",
+    "bidipy @ git+https://github.com/Trajano81/facbidpy.git",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.4",
+    "pytest-cov>=4.1",
+    "black>=23.0",
+    "ruff>=0.1",
+    "jupyter>=1.0",
+    "ipykernel>=6.0",
+]
+
+[tool.poetry]
+packages = [{include = "whitebox"}]
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.black]
+line-length = 100
+
+[tool.ruff]
+line-length = 100
+select = ["E", "F", "I"]

@@ -6,8 +6,8 @@ from bokeh.io import output_notebook, curdoc, push_notebook, show
 from bokeh.layouts import row, column
 from bokeh.palettes import magma, viridis, cividis, RdYlBu, Category20c, Spectral
 from collections import OrderedDict
-from .Plot_interface import Plot_interface
-from ..libs import *
+from .base import PlotEngine
+from ..utils import *
 import pandas as pd
 import numpy as np
 
@@ -15,9 +15,9 @@ bokeh.io.reset_output()
 bokeh.io.output_notebook()
 
 
-class Bokeh_plot(Plot_interface):
-    def __init__(self, mintypython):
-        self.mintypython = mintypython
+class BokehEngine(PlotEngine):
+    def __init__(self, whitebox):
+        self.whitebox = whitebox
         pass
 
     def univariate_plot(self, kwargs, plot_data, var_name):
@@ -113,12 +113,12 @@ class Bokeh_plot(Plot_interface):
             width=0.9,
             source=source,
             line_color="white",
-            color=self.mintypython.config["colors"]["weight"],
+            color=self.whitebox.config["colors"]["weight"],
             alpha=0.5,
             y_range_name="Weight",
-            name=self.mintypython.config["labels"]["weight"],
+            name=self.whitebox.config["labels"]["weight"],
         )
-        L_items = [(self.mintypython.config["labels"]["weight"], [r_w])]
+        L_items = [(self.whitebox.config["labels"]["weight"], [r_w])]
 
         # shap points
         if "shap_points" in kwargs.keys():
@@ -149,11 +149,11 @@ class Bokeh_plot(Plot_interface):
                     source=source,
                     size=2,
                     alpha=0.8,
-                    name=self.mintypython.config["labels"]["shap_points"],
-                    color=self.mintypython.config["colors"]["shap_points"],
+                    name=self.whitebox.config["labels"]["shap_points"],
+                    color=self.whitebox.config["colors"]["shap_points"],
                 )
                 L_items.append(
-                    (self.mintypython.config["labels"]["shap_points"], [r_shap])
+                    (self.whitebox.config["labels"]["shap_points"], [r_shap])
                 )
 
         if "shap_sd" in kwargs.keys() and kwargs["shap_sd"]:
@@ -173,15 +173,15 @@ class Bokeh_plot(Plot_interface):
             sd_shap = p.vbar(
                 x="var",
                 source=source,
-                width=self.mintypython.config["line_width"]["shap_sd"],
+                width=self.whitebox.config["line_width"]["shap_sd"],
                 bottom="bottom",
                 top="top",
-                color=self.mintypython.config["colors"]["shap_sd"],
-                name=self.mintypython.config["labels"]["shap_sd"],
+                color=self.whitebox.config["colors"]["shap_sd"],
+                name=self.whitebox.config["labels"]["shap_sd"],
                 fill_alpha=0.3,
                 line_alpha=0,
             )
-            L_items.append((self.mintypython.config["labels"]["shap_sd"], [sd_shap]))
+            L_items.append((self.whitebox.config["labels"]["shap_sd"], [sd_shap]))
         # Lines
         for line in ["shap", "glm", "actuals", "glm_pred", "gbm_pred"]:
             if line in kwargs.keys() and kwargs[line]:
@@ -204,9 +204,9 @@ class Bokeh_plot(Plot_interface):
                     x="var",
                     y="y",
                     source=source,
-                    line_width=self.mintypython.config["line_width"][line],
-                    name=self.mintypython.config["labels"][line],
-                    color=self.mintypython.config["colors"][line],
+                    line_width=self.whitebox.config["line_width"][line],
+                    name=self.whitebox.config["labels"][line],
+                    color=self.whitebox.config["colors"][line],
                 )
                 c_avg = p.diamond(
                     x="var",
@@ -214,11 +214,11 @@ class Bokeh_plot(Plot_interface):
                     source=source,
                     size=10,
                     alpha=0.9,
-                    name=self.mintypython.config["labels"][line],
-                    color=self.mintypython.config["colors"][line],
+                    name=self.whitebox.config["labels"][line],
+                    color=self.whitebox.config["colors"][line],
                 )
                 L_items.append(
-                    (self.mintypython.config["labels"][line], [r_avg, c_avg])
+                    (self.whitebox.config["labels"][line], [r_avg, c_avg])
                 )
 
         if "glm_ci" in kwargs.keys() and kwargs["glm_ci"]:
@@ -237,22 +237,22 @@ class Bokeh_plot(Plot_interface):
             s_avg = p.line(
                 x_indices,
                 sup / glmbase,
-                line_width=self.mintypython.config["line_width"]["glm_pred"],
+                line_width=self.whitebox.config["line_width"]["glm_pred"],
                 line_dash="dashed",
                 name="sup",
-                color=self.mintypython.config["colors"]["glm_pred"],
+                color=self.whitebox.config["colors"]["glm_pred"],
             )
             i_avg = p.line(
                 x_indices,
                 inf / glmbase,
-                line_width=self.mintypython.config["line_width"]["glm_pred"],
+                line_width=self.whitebox.config["line_width"]["glm_pred"],
                 line_dash="dashed",
                 name="inf",
-                color=self.mintypython.config["colors"]["glm_pred"],
+                color=self.whitebox.config["colors"]["glm_pred"],
             )
             L_items.append(
                 (
-                    self.mintypython.config["labels"]["glm_ci"]
+                    self.whitebox.config["labels"]["glm_ci"]
                     + str(kwargs["ci_z"])
                     + " \u03C3",
                     [i_avg, s_avg],
@@ -546,7 +546,7 @@ class Bokeh_plot(Plot_interface):
 
                 legend_item_list.append(
                     (
-                        self.mintypython.config["labels"]["actuals"]
+                        self.whitebox.config["labels"]["actuals"]
                         + var2
                         + "="
                         + str(level),
@@ -596,7 +596,7 @@ class Bokeh_plot(Plot_interface):
 
                 legend_item_list.append(
                     (
-                        self.mintypython.config["labels"]["gbm_pred"]
+                        self.whitebox.config["labels"]["gbm_pred"]
                         + var2
                         + "="
                         + str(level),
@@ -731,12 +731,12 @@ class Bokeh_plot(Plot_interface):
             width=0.9,
             source=source,
             line_color="white",
-            color=self.mintypython.config["colors"]["weight"],
+            color=self.whitebox.config["colors"]["weight"],
             alpha=0.5,
             y_range_name="Weight",
-            name=self.mintypython.config["labels"]["weight"],
+            name=self.whitebox.config["labels"]["weight"],
         )
-        L_items = [(self.mintypython.config["labels"]["weight"], [r_w])]
+        L_items = [(self.whitebox.config["labels"]["weight"], [r_w])]
 
         # Colormap
         lbs = []
@@ -781,7 +781,7 @@ class Bokeh_plot(Plot_interface):
                     )
                     L_items.append(
                         (
-                            self.mintypython.config["labels"]["shap_points"]
+                            self.whitebox.config["labels"]["shap_points"]
                             + " "
                             + model_id,
                             [r_shap],
@@ -808,7 +808,7 @@ class Bokeh_plot(Plot_interface):
                         x="var",
                         y="y",
                         source=source,
-                        line_width=self.mintypython.config["line_width"][line],
+                        line_width=self.whitebox.config["line_width"][line],
                         name=name,
                         color=colormap[name],
                     )
@@ -823,7 +823,7 @@ class Bokeh_plot(Plot_interface):
                     )
                     L_items.append(
                         (
-                            self.mintypython.config["labels"][line] + " " + model_id,
+                            self.whitebox.config["labels"][line] + " " + model_id,
                             [r_avg, c_avg],
                         )
                     )

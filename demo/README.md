@@ -1,17 +1,76 @@
-# MintyPython Demo
+# Whitebox Demo
 
-This folder contains a self-contained demo that demonstrates all MintyPython features using synthetic insurance-like data.
+This folder contains a self-contained demo that demonstrates all Whitebox features using synthetic insurance-like data.
 
-## Quick Start
+## Quick Start with Poetry (Recommended)
+
+### 1. Install Poetry
+
+If you haven't installed Poetry yet:
+```bash
+curl -sSL https://install.python-poetry.org | python3 -
+```
+
+### 2. Configure Poetry for In-Project Virtual Environment
+
+```bash
+# Navigate to the project root directory
+cd /path/to/whitebox
+
+# Configure Poetry to create .venv in project folder (optional but recommended)
+poetry config virtualenvs.in-project true --local
+```
+
+### 3. Install Dependencies
+
+```bash
+# Install all dependencies (creates .venv/ in project folder)
+poetry install
+
+# Install dev dependencies (includes jupyter and ipykernel)
+poetry install --with dev
+```
+
+### 4. Create Jupyter Kernel
+
+```bash
+# Create a Jupyter kernel for this environment
+poetry run python -m ipykernel install --user --name=whitebox-demo --display-name="Whitebox Demo"
+```
+
+### 5. Run the Demo Notebook
+
+**Option A: Using Jupyter in browser**
+```bash
+# Activate shell first, then run jupyter
+poetry shell
+jupyter notebook demo/demo_notebook.ipynb
+
+# Or run directly with poetry run
+poetry run jupyter notebook demo/demo_notebook.ipynb
+```
+
+**Option B: Using VS Code (Recommended)**
+1. Open VS Code in the project folder:
+   ```bash
+   code /path/to/whitebox
+   ```
+2. Install the "Jupyter" extension if not already installed
+3. Open `demo/demo_notebook.ipynb`
+4. Click "Select Kernel" in the top right corner
+5. Choose "Whitebox Demo" from the kernel list
+6. Run the cells with `Shift+Enter`
+
+> **Tip:** If "Whitebox Demo" doesn't appear, run the kernel installation command from Step 4 and restart VS Code.
+
+## Alternative: Traditional Virtual Environment
 
 ### 1. Create and Activate Virtual Environment
-
-We recommend using a virtual environment to avoid conflicts with other packages.
 
 **On macOS/Linux:**
 ```bash
 # Navigate to the project root directory
-cd /path/to/plotting_minty
+cd /path/to/whitebox
 
 # Create virtual environment
 python -m venv venv
@@ -23,7 +82,7 @@ source venv/bin/activate
 **On Windows:**
 ```bash
 # Navigate to the project root directory
-cd \path\to\plotting_minty
+cd \path\to\whitebox
 
 # Create virtual environment
 python -m venv venv
@@ -32,17 +91,10 @@ python -m venv venv
 venv\Scripts\activate
 ```
 
-You should see `(venv)` at the beginning of your terminal prompt when the environment is activated.
-
-### 2. Install MintyPython and Dependencies
-
-With the virtual environment activated, install the package:
+### 2. Install Whitebox
 
 ```bash
-# Install all dependencies from requirements.txt (from project root)
-pip install -r requirements.txt
-
-# Install mintypython in development mode (from project root)
+# Install the package in development mode
 pip install -e .
 
 # Install Jupyter notebook support
@@ -51,29 +103,21 @@ pip install jupyter ipykernel
 
 ### 3. Create a Jupyter Kernel
 
-Register the virtual environment as a Jupyter kernel so you can select it in notebooks:
+Register the virtual environment as a Jupyter kernel:
 
 ```bash
-# Create Jupyter kernel
-python -m ipykernel install --user --name=mintypython-demo --display-name="MintyPython Demo"
+python -m ipykernel install --user --name=whitebox-demo --display-name="Whitebox Demo"
 ```
 
 ### 4. Run the Demo Notebook
 
 ```bash
-# From the project root
 jupyter notebook demo/demo_notebook.ipynb
-
-# OR from the demo directory
-cd demo
-jupyter notebook demo_notebook.ipynb
 ```
 
-**Using VS Code:** Open `demo_notebook.ipynb` and select "MintyPython Demo" from the kernel picker in the top right.
+**Using VS Code:** Open `demo_notebook.ipynb` and select "Whitebox Demo" from the kernel picker.
 
 ### Deactivating the Virtual Environment
-
-When you're done, deactivate the virtual environment:
 
 ```bash
 deactivate
@@ -84,8 +128,8 @@ deactivate
 ### Files
 
 - **`synthetic_data.py`**: Module that generates synthetic insurance data and trains an XGBoost model
-- **`glm_helpers.py`**: Module that simulates GLM relativities for demonstration (since Emblem exports are proprietary)
-- **`demo_notebook.ipynb`**: Jupyter notebook demonstrating all MintyPython methods
+- **`glm_helpers.py`**: Module that simulates GLM relativities for demonstration
+- **`demo_notebook.ipynb`**: Jupyter notebook demonstrating all Whitebox methods
 
 ### Demo Coverage
 
@@ -107,6 +151,54 @@ The notebook demonstrates:
 5. **Model Comparison**: Comparing multiple models using the `compare()` method
 6. **Configuration**: Customizing colors, labels, and line widths
 7. **Plot Engines**: Both Bokeh (interactive) and Matplotlib (static) engines
+
+## Categorical Variable Encoding
+
+When working with categorical variables, Whitebox supports displaying labels in "Label(code)" format (e.g., "North(0)", "South(1)"). To enable this:
+
+### 1. Create encoded columns with `_encoded` suffix
+
+```python
+# Original categorical column
+df['region'] = ['North', 'South', 'East', 'West', ...]
+
+# Create encoded version with _encoded suffix
+df['region_encoded'] = df['region'].map({
+    'North': 0,
+    'South': 1,
+    'East': 2,
+    'West': 3
+})
+```
+
+### 2. Define category mappings
+
+```python
+category_mappings = {
+    'region': {0: 'North', 1: 'South', 2: 'East', 3: 'West'},
+    'vehicle_type': {0: 'Sedan', 1: 'SUV', 2: 'Truck', 3: 'Sports'}
+}
+```
+
+### 3. Pass mappings to Whitebox
+
+```python
+wb = Whitebox(
+    data=df,
+    model=model,
+    feature_names=['age', 'region_encoded', 'vehicle_type_encoded', ...],
+    category_mappings=category_mappings,
+    weight_col='exposure',
+    actuals_col='claim_count'
+)
+```
+
+### 4. Plot with automatic label display
+
+```python
+# Labels will show as "North(0)", "South(1)", etc.
+wb.univariate_plot('region_encoded', shap=True)
+```
 
 ## Synthetic Data Description
 
@@ -130,18 +222,20 @@ The claim frequency is modeled with realistic relationships:
 
 ## GLM Integration Note
 
-Since Emblem model exports are proprietary, this demo uses simulated GLM relativities created by `glm_helpers.py`. The simulated relativities mirror realistic GLM factor structures and demonstrate how MintyPython displays GLM comparisons.
+Since Emblem model exports are proprietary, this demo uses simulated GLM relativities created by `glm_helpers.py`. The simulated relativities mirror realistic GLM factor structures and demonstrate how Whitebox displays GLM comparisons.
 
-If you have actual Emblem exports (`.emb` files), you can use them with MintyPython by passing the `emb_model_export` parameter instead of the simulated `glm_df`.
+If you have actual Emblem exports (`.emb` files), you can use them with Whitebox by passing the `emb_model_export` parameter instead of the simulated `glm_df`.
 
 ## Troubleshooting
 
-### ImportError: No module named 'mintypython'
-Make sure you installed the package in development mode:
+### ImportError: No module named 'whitebox'
+Make sure you installed the package:
 ```bash
-pip install -e ..  # From demo directory
-# OR
-pip install -e .   # From project root
+# With Poetry
+poetry install
+
+# Or with pip
+pip install -e .
 ```
 
 ### Plots not displaying in Jupyter
@@ -152,9 +246,12 @@ output_notebook()
 ```
 
 ### Missing dependencies
-The `requirements.txt` file includes all required dependencies. If you encounter missing packages:
+With Poetry:
 ```bash
-pip install -r requirements.txt  # Install all dependencies
-# OR reinstall the package
+poetry install
+```
+
+With pip:
+```bash
 pip install -e .
 ```

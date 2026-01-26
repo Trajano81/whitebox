@@ -1,10 +1,10 @@
-from .libs import *
-from .Data_prep import Data_prep
+from .utils import *
+from .data_prep import DataPrep
 from bidipy import fac_file
 import xgboost as xgb
 
 
-class mintypython:
+class Whitebox:
     def __init__(
         self,
         data,
@@ -58,7 +58,7 @@ class mintypython:
             :param emb_gbm_map: if you used banded variables in emblem but continuous in GBM, use this dictionary to link both {"GBM var":"EMB var"}
             :type emb_gbm_map: String
 
-            :param glm_preds_col: glm prediction column, if not passed mintypython will try to use scorepyon to create the predictions
+            :param glm_preds_col: glm prediction column, if not passed Whitebox will try to use scorepyon to create the predictions
             :type glm_preds_col: String
 
             :param gbm_preds_col: gbm prediction column, if not passed the model will be used to score the data
@@ -252,12 +252,12 @@ class mintypython:
                     if i in self.emb_mdl.keys():
                         self.emb_mdl[self.rename_glm[i]] = self.emb_mdl[i]
 
-        self.Data_prep = Data_prep(self)
+        self.DataPrep = DataPrep(self)
         if prep_glm_df:
-            self.Data_prep.prep_glm_df()
+            self.DataPrep.prep_glm_df()
 
         # Process categorical columns (reconstruct mappings or encode)
-        self.Data_prep.process_categoricals()
+        self.DataPrep.process_categoricals()
 
         # Load fac_file or use mapping fallbacks
         if fac_file_path != None:
@@ -449,7 +449,7 @@ class mintypython:
         kwargs["height"] = height
         kwargs["width"] = width
 
-        plot_data = self.Data_prep.prep_univariate_data(var_name, kwargs)
+        plot_data = self.DataPrep.prep_univariate_data(var_name, kwargs)
 
         if engine is None:
             engine = self.default_engine
@@ -574,11 +574,11 @@ class mintypython:
         if actuals:
             if self.actuals_col is None:
                 print(
-                    "If you want to plot actuals you must provide a actuals_col in the mintypython call e.g mintypython(actuals_col='your actuals column')"
+                    "If you want to plot actuals you must provide a actuals_col in the Whitebox call e.g Whitebox(actuals_col='your actuals column')"
                 )
                 actuals = False
 
-        data_to_plot, data_to_plot_agg = self.Data_prep.prep_bivariate_data(
+        data_to_plot, data_to_plot_agg = self.DataPrep.prep_bivariate_data(
             var1,
             var2,
             shap,
@@ -767,14 +767,14 @@ class mintypython:
         """
         Creates plot comparing multiple models
 
-        :param mintlist: list of mintypython instances
-        :type mintlist: list
+        :param wblist: list of Whitebox instances
+        :type wblist: list
 
         :param var_name: string Variable name
         :type var_name: string
 
-        :param mintynames: List of model names/identifyers
-        :type mintynames: List(String)
+        :param model_names: List of model names/identifiers
+        :type model_names: List(String)
 
         :param base: Define a base level
         :type base: string
@@ -896,7 +896,7 @@ class mintypython:
         kwargs["height"] = height
         kwargs["width"] = width
 
-        merged_data, merged_shap_points = self.Data_prep.prep_compare_data(
+        merged_data, merged_shap_points = self.DataPrep.prep_compare_data(
             var_name, mintylist, **kwargs
         )
 

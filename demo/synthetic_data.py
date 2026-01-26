@@ -1,8 +1,8 @@
 """
-Synthetic data generation for MintyPython demo.
+Synthetic data generation for Whitebox demo.
 
 This module generates synthetic insurance-like data for demonstrating
-MintyPython's visualization capabilities.
+Whitebox's visualization capabilities.
 """
 
 import numpy as np
@@ -285,6 +285,10 @@ def prepare_data_for_mintypython(data, feature_names, optimize=False, verbose=Tr
     cat_cols = [col for col in feature_names if _is_string_dtype(data[col].dtype)]
 
     return encode_categoricals(data, columns=cat_cols, optimize=optimize, verbose=verbose)
+
+
+# Alias for backward compatibility and new naming
+prepare_data_for_whitebox = prepare_data_for_mintypython
 
 
 def get_demo_data_and_model(n_samples=10000, random_state=42):
