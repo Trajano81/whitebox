@@ -590,9 +590,11 @@ class Data_prep:
             banded_var = self.mintypython.data[group_by_var]
 
         # Apply fac_mapping to show labels with encoded values: "Label(code)"
+        # Only apply if banded_var contains numeric codes (not already string labels)
         if (
             self.mintypython.fac_mapping is not None
             and group_by_var in self.mintypython.fac_mapping
+            and pd.api.types.is_numeric_dtype(banded_var)
         ):
             mapping = self.mintypython.fac_mapping[group_by_var]
             # Create combined label: "Label(code)" with both int and str keys
