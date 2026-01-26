@@ -54,16 +54,29 @@ def create_glm_relativities(data, feature_names):
 
     # Region relativities (categorical, log scale)
     if 'region' in feature_names:
-        # Map numeric codes to log-relativities
-        # Assuming: 0=East, 1=North, 2=South, 3=West (alphabetical encoding)
-        region_effects = {0: -0.05, 1: 0.0, 2: 0.10, 3: 0.05}  # North as base
-        glm_df['region'] = data['region'].map(region_effects)
+        # Use _encoded column if available, otherwise use original column
+        region_col = 'region_encoded' if 'region_encoded' in data.columns else 'region'
+        if data[region_col].dtype == 'object':
+            # Map string values to log-relativities
+            region_effects = {'East': -0.05, 'North': 0.0, 'South': 0.10, 'West': 0.05}
+        else:
+            # Map numeric codes to log-relativities
+            # Assuming: 0=East, 1=North, 2=South, 3=West (alphabetical encoding)
+            region_effects = {0: -0.05, 1: 0.0, 2: 0.10, 3: 0.05}  # North as base
+        glm_df['region'] = data[region_col].map(region_effects)
 
     # Vehicle type relativities (categorical, log scale)
     if 'vehicle_type' in feature_names:
-        # Assuming: 0=SUV, 1=Sedan, 2=Sports, 3=Truck (alphabetical encoding)
-        vtype_effects = {0: 0.10, 1: 0.0, 2: 0.40, 3: -0.05}  # Sedan as base
-        glm_df['vehicle_type'] = data['vehicle_type'].map(vtype_effects)
+        # Use _encoded column if available, otherwise use original column
+        vtype_col = 'vehicle_type_encoded' if 'vehicle_type_encoded' in data.columns else 'vehicle_type'
+        if data[vtype_col].dtype == 'object':
+            # Map string values to log-relativities
+            vtype_effects = {'SUV': 0.10, 'Sedan': 0.0, 'Sports': 0.40, 'Truck': -0.05}
+        else:
+            # Map numeric codes to log-relativities
+            # Assuming: 0=SUV, 1=Sedan, 2=Sports, 3=Truck (alphabetical encoding)
+            vtype_effects = {0: 0.10, 1: 0.0, 2: 0.40, 3: -0.05}  # Sedan as base
+        glm_df['vehicle_type'] = data[vtype_col].map(vtype_effects)
 
     return glm_df
 

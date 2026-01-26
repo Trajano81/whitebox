@@ -57,6 +57,71 @@ class Data_prep:
 
         self.mintypython.glm_df = glm_df
 
+    def process_categoricals(self, columns=None):
+        """
+        Process categorical columns: encode if needed, reconstruct mappings if possible.
+
+        Column naming convention:
+        - Original column keeps human-readable values (e.g., 'region')
+        - Encoded column has '_encoded' suffix (e.g., 'region_encoded')
+
+        Handles multiple scenarios:
+        - Object columns WITH mapping: create {col}_encoded using provided mapping
+        - Object columns WITHOUT mapping: warn (must provide mapping from training)
+        - Columns with _encoded suffix: reconstruct mapping from pair
+        - Numerical/int columns: skip
+
+        Parameters
+        ----------
+        columns : list, optional
+            Specific columns to process. If None, processes all feature_names.
+
+        Returns
+        -------
+        dict
+            Updated category_mappings {column: {code: label}}
+        """
+        if columns is None:
+            columns = self.mintypython.feature_names
+
+        processed_columns = []
+        for col in columns:
+            if col not in self.mintypython.data.columns:
+                continue
+
+            col_dtype = self.mintypython.data[col].dtype
+            encoded_col = f'{col}_encoded'
+            has_encoded = encoded_col in self.mintypython.data.columns
+            has_mapping = col in self.mintypython.category_mappings
+
+            # Scenario 3: Has _encoded column already - reconstruct mapping from pair
+            if has_encoded:
+                if not has_mapping:
+                    unique_pairs = self.mintypython.data[[col, encoded_col]].drop_duplicates()
+                    self.mintypython.category_mappings[col] = dict(
+                        zip(unique_pairs[encoded_col], unique_pairs[col])
+                    )
+                processed_columns.append(col)
+
+            # Scenario 2: Object column WITH mapping - create encoded
+            elif col_dtype == 'object' and has_mapping:
+                label_to_code = {v: k for k, v in self.mintypython.category_mappings[col].items()}
+                self.mintypython.data[encoded_col] = self.mintypython.data[col].map(label_to_code)
+                processed_columns.append(col)
+
+            # Scenario 1: Object column WITHOUT mapping - warn and skip
+            elif col_dtype == 'object' and not has_mapping:
+                if self.mintypython.verbose:
+                    print(f"Warning: '{col}' is object type but no category_mappings provided. "
+                          f"Cannot encode without mapping from training.")
+
+            # Scenario 4: Numerical/int columns - skip silently
+
+        if self.mintypython.verbose and processed_columns:
+            print(f"Processed {len(processed_columns)} categorical column(s): {processed_columns}")
+
+        return self.mintypython.category_mappings
+
     def prep_shap_values(self, out_file=""):
         """
         Prepare shapley values and stores in the self.shap_df attribute
@@ -67,14 +132,21 @@ class Data_prep:
         self.mintypython.explainer = shap.TreeExplainer(self.mintypython.model)
 
         if os.path.exists(out_file) == False:
-            shap_values = self.mintypython.explainer.shap_values(
-                self.mintypython.data[self.mintypython.feature_names]
-            )
+            # Build feature data for SHAP, using _encoded columns where available
+            shap_data = pd.DataFrame()
+            for col in self.mintypython.feature_names:
+                encoded_col = f'{col}_encoded'
+                if encoded_col in self.mintypython.data.columns:
+                    shap_data[col] = self.mintypython.data[encoded_col]  # Use encoded
+                else:
+                    shap_data[col] = self.mintypython.data[col]  # Use original
+
+            shap_values = self.mintypython.explainer.shap_values(shap_data)
             shap_values = self.mintypython.link_fn(shap_values)
             self.mintypython.shap_df = pd.DataFrame(
                 shap_values,
-                columns=self.mintypython.feature_names,
-                index=self.mintypython.data[self.mintypython.feature_names].index,
+                columns=self.mintypython.feature_names,  # Keep original names
+                index=shap_data.index,
             )
             if out_file != "":
                 self.mintypython.shap_df.to_pickle(out_file)
@@ -175,13 +247,18 @@ class Data_prep:
                 / data_to_plot_agg["weight"]
             )
 
+        # Apply fac_mapping only if x_axis contains numeric codes that need mapping
+        # Skip if x_axis already contains string labels (no mapping needed)
         if self.mintypython.fac_mapping != None and group_by_var in self.mintypython.fac_mapping:
-            data_to_plot["x_axis"] = data_to_plot["x_axis"].map(
-                self.mintypython.fac_mapping[group_by_var]
-            )
-            data_to_plot_agg.index = pd.Series(data_to_plot_agg.index).map(
-                self.mintypython.fac_mapping[group_by_var]
-            )
+            x_axis_dtype = data_to_plot["x_axis"].dtype
+            # Only map if x_axis is numeric (int/float) - string values don't need mapping
+            if pd.api.types.is_numeric_dtype(x_axis_dtype):
+                data_to_plot["x_axis"] = data_to_plot["x_axis"].map(
+                    self.mintypython.fac_mapping[group_by_var]
+                )
+                data_to_plot_agg.index = pd.Series(data_to_plot_agg.index).map(
+                    self.mintypython.fac_mapping[group_by_var]
+                )
 
         if "actuals" in kwargs.keys() and kwargs["actuals"]:
             if self.mintypython.actuals_col is None:

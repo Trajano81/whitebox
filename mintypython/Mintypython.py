@@ -28,6 +28,7 @@ class mintypython:
         shap_df=None,
         glm_df=None,
         prep_glm_df=False,
+        category_mappings=None,
         default_engine="Bokeh",
     ):
         """
@@ -142,6 +143,7 @@ class mintypython:
         self.feature_names = feature_names
         self.shap_df = shap_df
         self.glm_df = glm_df
+        self.category_mappings = category_mappings if category_mappings is not None else {}
 
         self.fac_mapping = None
         self.scorepyon_str = scorepyon_str
@@ -253,15 +255,21 @@ class mintypython:
         self.Data_prep = Data_prep(self)
         if prep_glm_df:
             self.Data_prep.prep_glm_df()
-        # Load fac_file
+
+        # Process categorical columns (reconstruct mappings or encode)
+        self.Data_prep.process_categoricals()
+
+        # Load fac_file or use mapping fallbacks
         if fac_file_path != None:
-            self.fac_mapping = fac_file.read_fac(fac_file_path)
+            self.fac_mapping = fac_file.read_fac(fac_file_path)  # Priority 1: GLM .fac file
             if self.rename_glm != None:
                 for i in self.rename_glm.keys():
                     if i in self.emb_mdl.keys():
                         self.fac_mapping[self.rename_glm[i]] = self.fac_mapping[i]
         elif mapping_dict != None:
-            self.fac_mapping = mapping_dict
+            self.fac_mapping = mapping_dict                       # Priority 2: User-provided
+        elif self.category_mappings:
+            self.fac_mapping = self.category_mappings             # Priority 3: From encoding
         self.default_engine = default_engine
     
     def univariate_plot(
@@ -703,8 +711,18 @@ class mintypython:
             else:
                 self.link_fn_str = xgb_map[model_objective]
 
+        # Build feature data for DMatrix, using _encoded columns where available
+        import pandas as pd
+        x_data_df = pd.DataFrame()
+        for col in self.feature_names:
+            encoded_col = f'{col}_encoded'
+            if encoded_col in self.data.columns:
+                x_data_df[col] = self.data[encoded_col]  # Use encoded
+            else:
+                x_data_df[col] = self.data[col]  # Use original
+
         self.x_data = xgb.DMatrix(
-            self.data[self.feature_names],
+            x_data_df,
             weight=self.data[self.weight_col],
             feature_names=self.feature_names,
         )

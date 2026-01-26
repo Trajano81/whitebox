@@ -92,12 +92,14 @@ def train_xgboost_model(data, feature_names, weight_col='exposure',
     """
     Train an XGBoost model with Poisson objective for claim frequency.
 
+    Uses {col}_encoded columns if available, otherwise encodes object columns.
+
     Parameters
     ----------
     data : pd.DataFrame
-        Training data
+        Training data (ideally from prepare_data_for_mintypython with _encoded columns)
     feature_names : list
-        List of feature column names
+        List of feature column names (original names, not _encoded)
     weight_col : str
         Name of weight/exposure column
     target_col : str
@@ -112,12 +114,16 @@ def train_xgboost_model(data, feature_names, weight_col='exposure',
     xgb.Booster
         Trained XGBoost model
     """
-    # Prepare data for XGBoost
-    X = data[feature_names].copy()
-
-    # Encode categorical variables
-    for col in X.select_dtypes(include=['object']).columns:
-        X[col] = X[col].astype('category').cat.codes
+    # Prepare data for XGBoost using _encoded columns where available
+    X = pd.DataFrame()
+    for col in feature_names:
+        encoded_col = f'{col}_encoded'
+        if encoded_col in data.columns:
+            X[col] = data[encoded_col]  # Use pre-encoded column
+        elif data[col].dtype == 'object':
+            X[col] = data[col].astype('category').cat.codes  # Fallback encoding
+        else:
+            X[col] = data[col]  # Use as-is
 
     y = data[target_col]
     weights = data[weight_col]
@@ -158,9 +164,9 @@ def encode_categoricals(data, columns=None, optimize=False, verbose=True):
     """
     Prepare DataFrame for modeling: encode categoricals and optionally optimize numerics.
 
-    - Always encodes object/string columns to integer codes (int8/int16)
-    - Always preserves original values in {col}_original columns as category dtype
-    - Optionally downcasts numeric columns (int64->int8/16/32, float64->float32)
+    Column naming convention:
+    - Original column keeps human-readable values (e.g., 'region')
+    - Encoded column has '_encoded' suffix (e.g., 'region_encoded')
 
     Parameters
     ----------
@@ -176,7 +182,7 @@ def encode_categoricals(data, columns=None, optimize=False, verbose=True):
     Returns
     -------
     pd.DataFrame
-        Data with encoded columns and {col}_original columns
+        Data with original columns unchanged and {col}_encoded columns added
     dict
         Mapping of {column: {code: label}}
     """
@@ -203,13 +209,13 @@ def encode_categoricals(data, columns=None, optimize=False, verbose=True):
 
         # ALWAYS encode object/string columns
         if col in columns and _is_string_dtype(dtype):
-            # Save original values as category dtype
-            data_encoded[f'{col}_original'] = data[col].astype('category')
-            # Encode to integer codes
+            encoded_col = f'{col}_encoded'
+            # Encode to integer codes in new _encoded column
             cat_series = data[col].astype('category')
             n_categories = len(cat_series.cat.categories)
             code_dtype = 'int8' if n_categories <= 127 else 'int16'
-            data_encoded[col] = cat_series.cat.codes.astype(code_dtype)
+            data_encoded[encoded_col] = cat_series.cat.codes.astype(code_dtype)
+            # Original column unchanged (human-readable values preserved)
             # Store mapping
             category_mappings[col] = dict(enumerate(cat_series.cat.categories))
             encoded_columns.append(col)
@@ -233,7 +239,7 @@ def encode_categoricals(data, columns=None, optimize=False, verbose=True):
     if verbose:
         if encoded_columns:
             print(f"Encoded {len(encoded_columns)} categorical column(s): {encoded_columns}")
-            print(f"Original values preserved in: {[f'{col}_original' for col in encoded_columns]}")
+            print(f"Encoded columns created: {[f'{col}_encoded' for col in encoded_columns]}")
         if numeric_optimized:
             print(f"Optimized {len(numeric_optimized)} numeric column(s):")
             for change in numeric_optimized:
@@ -247,6 +253,10 @@ def prepare_data_for_mintypython(data, feature_names, optimize=False, verbose=Tr
     """
     Prepare data DataFrame for use with MintyPython.
     Encodes categorical variables and optionally optimizes numeric dtypes.
+
+    Column naming convention:
+    - Original column keeps human-readable values (e.g., 'region')
+    - Encoded column has '_encoded' suffix (e.g., 'region_encoded')
 
     Parameters
     ----------
@@ -262,7 +272,7 @@ def prepare_data_for_mintypython(data, feature_names, optimize=False, verbose=Tr
     Returns
     -------
     pd.DataFrame
-        Data with encoded categorical variables (and {col}_original columns)
+        Data with original columns unchanged and {col}_encoded columns added
     dict
         Mapping of categorical values to codes
     """
