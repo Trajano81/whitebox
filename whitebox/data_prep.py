@@ -752,19 +752,19 @@ class DataPrep:
             )
         return data_to_plot, data_to_plot_agg
     
-    def prep_compare_data(self, var_name, mintylist, **kwargs):
+    def prep_compare_data(self, var_name, wblist, **kwargs):
         model_ids = kwargs["model_ids"]
         if len(np.unique(model_ids)) != len(model_ids):
             hp = np.unique(model_ids, return_counts=True)
             raise ValueError(
-                "Please make sure you do not have duplicated itens on mintynames items:"
+                "Please make sure you do not have duplicated items on model_names:"
                 + str(hp[0])
                 + " counts:"
                 + str(hp[1])
             )
 
         # Include the calling model (self.whitebox) as the first model
-        all_models = [self.whitebox] + mintylist
+        all_models = [self.whitebox] + wblist
         n = len(all_models)
         plot_data = list()
         agg_data = list()

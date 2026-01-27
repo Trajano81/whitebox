@@ -97,7 +97,7 @@ def train_xgboost_model(data, feature_names, weight_col='exposure',
     Parameters
     ----------
     data : pd.DataFrame
-        Training data (ideally from prepare_data_for_mintypython with _encoded columns)
+        Training data (ideally from prepare_data_for_whitebox with _encoded columns)
     feature_names : list
         List of feature column names (original names, not _encoded)
     weight_col : str
@@ -249,9 +249,9 @@ def encode_categoricals(data, columns=None, optimize=False, verbose=True):
     return data_encoded, category_mappings
 
 
-def prepare_data_for_mintypython(data, feature_names, optimize=False, verbose=True):
+def prepare_data_for_whitebox(data, feature_names, optimize=False, verbose=True):
     """
-    Prepare data DataFrame for use with MintyPython.
+    Prepare data DataFrame for use with Whitebox.
     Encodes categorical variables and optionally optimizes numeric dtypes.
 
     Column naming convention:
@@ -287,10 +287,6 @@ def prepare_data_for_mintypython(data, feature_names, optimize=False, verbose=Tr
     return encode_categoricals(data, columns=cat_cols, optimize=optimize, verbose=verbose)
 
 
-# Alias for backward compatibility and new naming
-prepare_data_for_whitebox = prepare_data_for_mintypython
-
-
 def get_demo_data_and_model(n_samples=10000, random_state=42):
     """
     Convenience function to get synthetic data and trained model.
@@ -314,7 +310,7 @@ def get_demo_data_and_model(n_samples=10000, random_state=42):
     feature_names = ['age', 'vehicle_value', 'years_licensed', 'region', 'vehicle_type']
 
     # Prepare for model training
-    data_encoded, category_mappings = prepare_data_for_mintypython(data, feature_names)
+    data_encoded, category_mappings = prepare_data_for_whitebox(data, feature_names)
 
     # Train model
     model = train_xgboost_model(

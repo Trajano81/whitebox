@@ -112,9 +112,9 @@ def create_glm_predictions(data, glm_df, exposure_col='exposure'):
     return prediction
 
 
-def get_glm_data_for_mintypython(data, feature_names):
+def get_glm_data_for_whitebox(data, feature_names):
     """
-    Convenience function to get GLM data formatted for MintyPython.
+    Convenience function to get GLM data formatted for Whitebox.
 
     Parameters
     ----------
@@ -136,13 +136,9 @@ def get_glm_data_for_mintypython(data, feature_names):
     return glm_df, glm_preds
 
 
-# Alias for new naming
-get_glm_data_for_whitebox = get_glm_data_for_mintypython
-
-
 def create_category_mapping_dict(category_mappings):
     """
-    Create a mapping dictionary suitable for MintyPython's mapping_dict parameter.
+    Create a mapping dictionary suitable for Whitebox's mapping_dict parameter.
 
     This helps label categorical variables in plots with their actual names
     instead of numeric codes.
@@ -150,17 +146,17 @@ def create_category_mapping_dict(category_mappings):
     Parameters
     ----------
     category_mappings : dict
-        Dictionary from prepare_data_for_mintypython with
+        Dictionary from prepare_data_for_whitebox with
         {column: {code: label}} structure
 
     Returns
     -------
     dict
-        Mapping dictionary for MintyPython
+        Mapping dictionary for Whitebox
     """
     mapping_dict = {}
     for col, code_to_label in category_mappings.items():
-        # MintyPython expects {column: {code: label}}
+        # Whitebox expects {column: {code: label}}
         mapping_dict[col] = code_to_label
     return mapping_dict
 
@@ -172,7 +168,7 @@ if __name__ == '__main__':
     data, model, feature_names, category_mappings = get_demo_data_and_model(n_samples=1000)
 
     print("Testing GLM helpers...")
-    glm_df, glm_preds = get_glm_data_for_mintypython(data, feature_names)
+    glm_df, glm_preds = get_glm_data_for_whitebox(data, feature_names)
 
     print(f"\nGLM DataFrame columns: {list(glm_df.columns)}")
     print(f"\nGLM relativities summary:")
