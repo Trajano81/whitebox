@@ -1,6 +1,5 @@
 from .utils import *
 from .data_prep import DataPrep
-from bidipy import fac_file
 import xgboost as xgb
 
 
@@ -13,21 +12,16 @@ class Whitebox:
         feature_names=None,
         actuals_col=None,
         verbose=True,
-        emb_model_export=None,
-        emb_gbm_map=dict(),
         glm_preds_col=None,
         gbm_preds_col=None,
-        use_labels=True,
         link_fn=None,
-        scorepyon_str=False,
-        fac_file_path=None,
         scale_parameter=1,
         tweedie_power=None,
         rename_glm=None,
         mapping_dict=None,
         shap_df=None,
         glm_df=None,
-        prep_glm_df=False,
+        glm_var_map=None,
         category_mappings=None,
         default_engine="Bokeh",
     ):
@@ -52,45 +46,33 @@ class Whitebox:
             :param verbose: Flag do display or not messages
             :type verbose: Boolean
 
-            :param emb_model_export: Emblem model export path.
-            :type emb_model_export: String
-
-            :param emb_gbm_map: if you used banded variables in emblem but continuous in GBM, use this dictionary to link both {"GBM var":"EMB var"}
-            :type emb_gbm_map: String
-
-            :param glm_preds_col: glm prediction column, if not passed Whitebox will try to use scorepyon to create the predictions
+            :param glm_preds_col: GLM prediction column name in data
             :type glm_preds_col: String
 
-            :param gbm_preds_col: gbm prediction column, if not passed the model will be used to score the data
+            :param gbm_preds_col: GBM prediction column, if not passed the model will be used to score the data
             :type gbm_preds_col: String
-
-            :param use_labels: for scorepyon to score the data
-            :type use_labels: Boolean
-
-            :param scorpyon_str: Converts scorpyon data to string before scoring
-            :type scorpyon_str: Boolean
 
             :param link_fn: link function to use if the objective is not present in the model ["poisson":"gamma":"identity","logistic"]
             :type link_fn: String
 
-            :param fac_file_path: If your data does not have labels, give me a fac_file i will make you life easier.
-            :type fac_file_path: String
-
             :param rename_glm: Rename dataframe columns before scoring glm.
             :type rename_glm: dictionary
 
-            :param mapping_dict: relabel levels in data, if a fac file is provided this parameter will be ignored.
+            :param mapping_dict: relabel levels in data, if category_mappings is provided this parameter will be ignored.
             :type mapping_dict: dictionary
 
             :param shap_df: The shapley values dataframe.
             :type shap_df: pandas dataframe
 
-            :param glm_df: A dataframe containing the indications
+            :param glm_df: A dataframe containing the GLM indications (factor relativities)
             :type glm_df: pandas dataframe
 
-            :param prep_glm_df: If you want to create glm_df from emb_model_export
-            :type prep_glm_df: boolean
-        
+            :param glm_var_map: Maps GBM variable names to GLM column names when they differ, e.g. {"age": "age_band"}
+            :type glm_var_map: dictionary
+
+            :param category_mappings: Dictionary mapping categorical variable codes to labels, e.g. {"region": {0: "North", 1: "South"}}
+            :type category_mappings: dictionary
+
         METHODS
         -------
         univariate_plot
@@ -111,12 +93,10 @@ class Whitebox:
 
         self.scale_parameter = scale_parameter
         self.tweedie_power = tweedie_power
-        self.use_labels = use_labels
         self.verbose = verbose
         self.data = data
 
         self.model = model
-        self.emb_model_export = emb_model_export
         self.actuals_col = actuals_col
 
         self.data[weight_col] = self.data[weight_col].astype("float64")
@@ -135,7 +115,7 @@ class Whitebox:
             self._glm_predictions = None
 
         self.weight_col = weight_col
-        self.emb_gbm_map = emb_gbm_map
+        self.glm_var_map = glm_var_map
         self.link_fn_str = link_fn
         self.glm_preds_col = glm_preds_col
 
@@ -146,8 +126,6 @@ class Whitebox:
         self.category_mappings = category_mappings if category_mappings is not None else {}
 
         self.fac_mapping = None
-        self.scorepyon_str = scorepyon_str
-        self.emb_mdl = None  # Initialize to None, will be set if emb_model_export is provided
         self.config = {
             "labels": {
                 "glm": "GLM indication",
@@ -226,50 +204,17 @@ class Whitebox:
         else:
             self._scorepyon_link_fn = "ERROR"
             self._ci_fn = None
-        # Load relativities from scorepyon
-        if emb_model_export != None:
-            self.emb_mdl = scp.get_factors(
-                [emb_model_export], link_fn=lambda x: x, use_labels=use_labels
-            )[0]
-
-            # Check how scorepyon is exporting the relativities.
-            k1 = list(self.emb_mdl.keys())[0]
-            # if is list, convert to value
-            if type(self.emb_mdl[k1]) == list:
-                new_dict = dict()
-                for var, lvls in self.emb_mdl.items():
-                    new_dict[var] = dict()
-                    if type(lvls) != list:
-                        for lvl, rel in lvls.items():
-                            new_dict[var][lvl] = rel[0]
-                    else:
-                        new_dict[var] = lvls[0]
-
-                self.emb_mdl = new_dict
-
-            if self.rename_glm != None:
-                for i in self.rename_glm.keys():
-                    if i in self.emb_mdl.keys():
-                        self.emb_mdl[self.rename_glm[i]] = self.emb_mdl[i]
 
         self.DataPrep = DataPrep(self)
-        if prep_glm_df:
-            self.DataPrep.prep_glm_df()
 
         # Process categorical columns (reconstruct mappings or encode)
         self.DataPrep.process_categoricals()
 
-        # Load fac_file or use mapping fallbacks
-        if fac_file_path != None:
-            self.fac_mapping = fac_file.read_fac(fac_file_path)  # Priority 1: GLM .fac file
-            if self.rename_glm != None:
-                for i in self.rename_glm.keys():
-                    if i in self.emb_mdl.keys():
-                        self.fac_mapping[self.rename_glm[i]] = self.fac_mapping[i]
-        elif mapping_dict != None:
-            self.fac_mapping = mapping_dict                       # Priority 2: User-provided
+        # Use mapping fallbacks for fac_mapping
+        if mapping_dict != None:
+            self.fac_mapping = mapping_dict                       # Priority 1: User-provided
         elif self.category_mappings:
-            self.fac_mapping = self.category_mappings             # Priority 3: From encoding
+            self.fac_mapping = self.category_mappings             # Priority 2: From encoding
         self.default_engine = default_engine
     
     def univariate_plot(

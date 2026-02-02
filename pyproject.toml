@@ -21,8 +21,6 @@ dependencies = [
     "seaborn>=0.13",
     "deepdiff>=6.0",
     "ipython>=8.0",
-    "scorepyon @ git+https://github.com/Trajano81/scoring_pricing.git",
-    "bidipy @ git+https://github.com/Trajano81/facbidpy.git",
 ]
 
 [project.optional-dependencies]

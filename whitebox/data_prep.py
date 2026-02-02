@@ -9,54 +9,6 @@ class DataPrep:
     def __init__(self, whitebox):
         self.whitebox = whitebox
 
-    def prep_glm_df(self):
-        glm_data = self.whitebox.data
-        mdl_export = self.whitebox.emb_mdl
-
-        block = glm_data.copy()
-        concatenator = "_xOx_"
-        export_dict = mdl_export
-        block_cols = list(block)
-        glm_df = pd.DataFrame()
-
-        base = export_dict.pop("Base", 0.0)
-        glm_df["Base"] = np.repeat(base, len(block))
-
-        for key, val in export_dict.items():
-            if key in block_cols:
-                glm_df[key] = block[key].map(val)
-            else:
-                problems = [
-                    col for col in key.split(concatenator) if col not in list(block)
-                ]
-                if problems:
-                    prob_key = key.replace(concatenator, "_x_")
-                    print(
-                        f"{prob_key} cannot be created from data. Accordingly, the prediction will "
-                        f"not include {prob_key} \n"
-                    )
-                else:
-                    intx = tuple(key.split(concatenator))
-                    if len(intx) == 2:
-                        v1, v2 = intx
-                        srs = block[v1].map(str) + "-" + block[v2].map(str)
-                    elif len(intx) == 3:
-                        v1, v2, v3 = intx
-                        srs = (
-                            block[v1].map(str)
-                            + "-"
-                            + block[v2].map(str)
-                            + "-"
-                            + block[v3].map(str)
-                        )
-                    else:
-                        raise ValueError(
-                            "There is likely a 4-way interaction. That is not supported"
-                        )
-                    glm_df[key] = srs.map(val)
-
-        self.whitebox.glm_df = glm_df
-
     def process_categoricals(self, columns=None):
         """
         Process categorical columns: encode if needed, reconstruct mappings if possible.
@@ -179,30 +131,25 @@ class DataPrep:
         glm_data_to_plot = None
         if "glm" in kwargs.keys() and kwargs["glm"]:
             if kwargs["glmindic_cols"] is None:
-                # Check if emblem model is available.
-                if self.whitebox.emb_mdl != None:
-                    # If the GLM vars are different than GBM but they are linked check if a variable map existis and variable is in the map and uses the glm variable to summarize shap.
-                    if self.whitebox.emb_gbm_map != None:
-                        if var_name in self.whitebox.emb_gbm_map.keys():
-                            group_by_var = self.whitebox.emb_gbm_map[var_name]
-                    # Check if var is in the glm
-                    if group_by_var in self.whitebox.emb_mdl.keys():
-                        # glm_data_to_plot=dict((k, self.whitebox.link_fn(v)) for k, v in self.whitebox.emb_mdl[group_by_var].items())
-                        glm_data_to_plot = self.whitebox.emb_mdl[group_by_var]
+                if self.whitebox.glm_df is not None:
+                    # Apply variable name mapping if provided
+                    if self.whitebox.glm_var_map and var_name in self.whitebox.glm_var_map:
+                        glm_col = self.whitebox.glm_var_map[var_name]
+                    else:
+                        glm_col = var_name
+                    # Check if the GLM column exists in glm_df
+                    if glm_col in self.whitebox.glm_df.columns:
+                        kwargs["glmindic_cols"] = [glm_col]
                     else:
                         print(
-                            "The variable "
-                            + group_by_var
-                            + "is not in the GLM model, if the variable is in the GLM but with a different name, use the parameter emb_gbm_map to map the variables the variable in the glm are:"
-                            + str(self.whitebox.emb_mdl.keys())
+                            f"The variable '{glm_col}' is not in glm_df. "
+                            f"Available columns are: {list(self.whitebox.glm_df.columns)}. "
+                            f"Use glm_var_map to map GBM variable names to GLM column names."
                         )
                         kwargs["glm"] = False
-                elif self.whitebox.glm_df is not None:
-                    # Auto-use var_name as glmindic_cols when glm_df is provided
-                    kwargs["glmindic_cols"] = [var_name]
                 else:
                     print(
-                        "No GLM model to display, if you want to display model relativities, provide a model export emb_model_export on the Whitebox construction"
+                        "No GLM data to display. Provide glm_df parameter in the Whitebox constructor."
                     )
                     kwargs["glm"] = False
 
@@ -326,73 +273,50 @@ class DataPrep:
         
         if "glm_pred" in kwargs.keys() and kwargs["glm_pred"]:
             if self.whitebox.glm_preds_col is None:
-                # If the prediction were already calculated donot calculate again
-                if self.whitebox._glm_predictions is None:
-                    # Scorepyon
-                    scr_data = self.whitebox.data.copy()
-                    for col in scr_data:
-                        if str(scr_data[col].dtype) == "category":
-                            scr_data[col] = scr_data[col].astype(str)
-                    nm = self.whitebox.emb_model_export.split("/")
-                    model_name = nm[len(nm) - 1].split(".")[0]
-                    if self.whitebox.scorepyon_str:
-                        for col in scr_data:
-                            scr_data[col] = scr_data[col].astype(str)
-                    if self.whitebox._scorepyon_link_fn == "ERROR":
-                        raise ValueError(
-                            "You must provide a link_fn on the class construction to score a glm"
-                        )
-                    if self.whitebox.rename_glm != None:
-                        inv_map = {v: k for k, v in self.whitebox.rename_glm.items()}
-                        scr_data = scr_data.rename(columns=inv_map)
-                    self.whitebox._glm_predictions = scp.score_frame(
-                        scr_data,
-                        self.whitebox.emb_model_export,
-                        link_fn=self.whitebox._scorepyon_link_fn,
-                        use_labels=self.whitebox.use_labels,
-                        reduce_mem=True,
-                    )[model_name]
-                data_to_plot["glm_pred_wgt"] = (
-                    self.whitebox._glm_predictions * data_to_plot["weight"]
+                print(
+                    "To plot GLM predictions, provide glm_preds_col parameter "
+                    "in the Whitebox constructor with the column name containing "
+                    "pre-computed GLM predictions."
                 )
+                kwargs["glm_pred"] = False
             else:
                 data_to_plot["glm_pred_wgt"] = (
                     self.whitebox.data[self.whitebox.glm_preds_col]
                     * data_to_plot["weight"]
                 )
 
-            data_to_plot_agg["glm_pred_wgt"] = data_to_plot.groupby(
-                "x_axis", dropna=False
-            )["glm_pred_wgt"].sum()
-            data_to_plot_agg["glm_pred"] = (
-                data_to_plot_agg["glm_pred_wgt"] / data_to_plot_agg["weight"]
-            )
+                data_to_plot_agg["glm_pred_wgt"] = data_to_plot.groupby(
+                    "x_axis", dropna=False
+                )["glm_pred_wgt"].sum()
+                data_to_plot_agg["glm_pred"] = (
+                    data_to_plot_agg["glm_pred_wgt"] / data_to_plot_agg["weight"]
+                )
 
-            if "glm_ci" in kwargs.keys() and kwargs["glm_ci"]:
-                if (
-                    self.whitebox.scale_parameter is not None
-                    and self.whitebox._ci_fn is not None
-                ):
-                    data_to_plot_agg["stdev"] = np.sqrt(
-                        self.whitebox._ci_fn(
-                            data_to_plot_agg["glm_pred"],
-                            data_to_plot_agg["weight"],
+                if "glm_ci" in kwargs.keys() and kwargs["glm_ci"]:
+                    if (
+                        self.whitebox.scale_parameter is not None
+                        and self.whitebox._ci_fn is not None
+                    ):
+                        data_to_plot_agg["stdev"] = np.sqrt(
+                            self.whitebox._ci_fn(
+                                data_to_plot_agg["glm_pred"],
+                                data_to_plot_agg["weight"],
+                            )
                         )
-                    )
-                    # central limit theorem
-                    data_to_plot_agg["glm_+2sigma"] = (
-                        data_to_plot_agg["glm_pred"]
-                        + kwargs["ci_z"] * data_to_plot_agg["stdev"]
-                    )
-                    data_to_plot_agg["glm_-2sigma"] = (
-                        data_to_plot_agg["glm_pred"]
-                        - kwargs["ci_z"] * data_to_plot_agg["stdev"]
-                    )
-                else:
-                    kwargs["glm_ci"] = False
-                    print(
-                        "To plot confidence intervals you must pass a scale_parameter and a link_fn to the class construction"
-                    )
+                        # central limit theorem
+                        data_to_plot_agg["glm_+2sigma"] = (
+                            data_to_plot_agg["glm_pred"]
+                            + kwargs["ci_z"] * data_to_plot_agg["stdev"]
+                        )
+                        data_to_plot_agg["glm_-2sigma"] = (
+                            data_to_plot_agg["glm_pred"]
+                            - kwargs["ci_z"] * data_to_plot_agg["stdev"]
+                        )
+                    else:
+                        kwargs["glm_ci"] = False
+                        print(
+                            "To plot confidence intervals you must pass a scale_parameter and a link_fn to the class construction"
+                        )
         if "gbm_pred" in kwargs.keys():
             # If the prediction were already calculated donot calculate again
             if self.whitebox._gbm_predictions is None:

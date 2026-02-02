@@ -222,9 +222,9 @@ The claim frequency is modeled with realistic relationships:
 
 ## GLM Integration Note
 
-Since Emblem model exports are proprietary, this demo uses simulated GLM relativities created by `glm_helpers.py`. The simulated relativities mirror realistic GLM factor structures and demonstrate how Whitebox displays GLM comparisons.
+This demo uses simulated GLM relativities created by `glm_helpers.py`. The simulated relativities mirror realistic GLM factor structures and demonstrate how Whitebox displays GLM comparisons.
 
-If you have actual Emblem exports (`.emb` files), you can use them with Whitebox by passing the `emb_model_export` parameter instead of the simulated `glm_df`.
+You can integrate GLM coefficients from any source (R, Python statsmodels, etc.) by creating a DataFrame with factor relativities and passing it via the `glm_df` parameter. Use `glm_var_map` to map GBM variable names to GLM column names if they differ.
 
 ## Troubleshooting
 
