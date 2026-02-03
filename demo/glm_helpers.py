@@ -16,6 +16,10 @@ def create_glm_relativities(data, feature_names):
     This function generates a DataFrame with GLM factor relativities that
     simulate what would be extracted from an Emblem model export via scorepyon.
 
+    The output uses GLM-style column names that differ from GBM feature names,
+    simulating a real-world scenario where GLM exports have different naming
+    conventions.
+
     Parameters
     ----------
     data : pd.DataFrame
@@ -26,7 +30,12 @@ def create_glm_relativities(data, feature_names):
     Returns
     -------
     pd.DataFrame
-        DataFrame with one column per feature containing log-relativities
+        DataFrame with GLM-style column names containing log-relativities:
+        - 'age' -> 'age_band'
+        - 'vehicle_value' -> 'sum_insured'
+        - 'years_licensed' -> 'driving_experience'
+        - 'region' -> 'territory'
+        - 'vehicle_type' -> 'vehicle_class'
     """
     glm_df = pd.DataFrame(index=data.index)
 
@@ -40,17 +49,17 @@ def create_glm_relativities(data, feature_names):
         log_rel_max = np.log(0.8)  # ~-0.223 for highest age
         # Normalize age to [0, 1] then interpolate
         age_normalized = (data['age'] - age_min) / (age_max - age_min)
-        glm_df['age'] = log_rel_min + age_normalized * (log_rel_max - log_rel_min)
+        glm_df['age_band'] = log_rel_min + age_normalized * (log_rel_max - log_rel_min)
 
     # Vehicle value relativities (log scale)
     if 'vehicle_value' in feature_names:
         value_centered = np.log(data['vehicle_value']) - np.log(30000)  # Base at 30k
-        glm_df['vehicle_value'] = 0.08 * value_centered
+        glm_df['sum_insured'] = 0.08 * value_centered
 
     # Years licensed relativities (log scale, more experience = lower risk)
     if 'years_licensed' in feature_names:
         exp_centered = data['years_licensed'] - 10  # Base at 10 years
-        glm_df['years_licensed'] = -0.018 * exp_centered
+        glm_df['driving_experience'] = -0.018 * exp_centered
 
     # Region relativities (categorical, log scale)
     if 'region' in feature_names:
@@ -63,7 +72,7 @@ def create_glm_relativities(data, feature_names):
             # Map numeric codes to log-relativities
             # Assuming: 0=East, 1=North, 2=South, 3=West (alphabetical encoding)
             region_effects = {0: -0.05, 1: 0.0, 2: 0.10, 3: 0.05}  # North as base
-        glm_df['region'] = data[region_col].map(region_effects)
+        glm_df['territory'] = data[region_col].map(region_effects)
 
     # Vehicle type relativities (categorical, log scale)
     if 'vehicle_type' in feature_names:
@@ -76,7 +85,7 @@ def create_glm_relativities(data, feature_names):
             # Map numeric codes to log-relativities
             # Assuming: 0=SUV, 1=Sedan, 2=Sports, 3=Truck (alphabetical encoding)
             vtype_effects = {0: 0.10, 1: 0.0, 2: 0.40, 3: -0.05}  # Sedan as base
-        glm_df['vehicle_type'] = data[vtype_col].map(vtype_effects)
+        glm_df['vehicle_class'] = data[vtype_col].map(vtype_effects)
 
     return glm_df
 
@@ -116,6 +125,9 @@ def get_glm_data_for_whitebox(data, feature_names):
     """
     Convenience function to get GLM data formatted for Whitebox.
 
+    Returns GLM relativities with GLM-style column names (different from GBM
+    feature names), simulating a real-world Emblem export scenario.
+
     Parameters
     ----------
     data : pd.DataFrame
@@ -127,7 +139,7 @@ def get_glm_data_for_whitebox(data, feature_names):
     -------
     tuple
         (glm_df, glm_predictions)
-        - glm_df: DataFrame with log-relativities for each feature
+        - glm_df: DataFrame with GLM-style column names and log-relativities
         - glm_predictions: Series with GLM predicted claim counts
     """
     glm_df = create_glm_relativities(data, feature_names)
@@ -170,7 +182,10 @@ if __name__ == '__main__':
     print("Testing GLM helpers...")
     glm_df, glm_preds = get_glm_data_for_whitebox(data, feature_names)
 
-    print(f"\nGLM DataFrame columns: {list(glm_df.columns)}")
+    print(f"\nGBM feature names: {feature_names}")
+    print(f"GLM DataFrame columns: {list(glm_df.columns)}")
+    print("\nNote: GLM columns use different names than GBM features!")
+    print("This simulates real-world Emblem exports where naming conventions differ.")
     print(f"\nGLM relativities summary:")
     print(glm_df.describe())
 
