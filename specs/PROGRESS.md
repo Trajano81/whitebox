@@ -60,8 +60,12 @@ Legend: [ ] todo, [~] in progress, [x] done, [!] blocked (see human-attention-ne
 - [x] server py_compile OK; tests green (54 unit, 3 skip) + committed
 
 ## Phase 7 - dev guidance skill (spec-007)
-- [ ] .claude/skills/whitebox-dev/SKILL.md (workflow + model-tiering guidance)
-- [ ] committed
+- [x] .claude/skills/whitebox-dev/SKILL.md (spec-driven flow + model-tiering + MCP tools + governance rules)
+- [x] committed
 
 ## Notes / blockers
-- (none yet)
+- All phases 0-7 implemented; `python -m pytest -m "not e2e"` is green (54 unit, 3 skipped: streamlit/mcp
+  extras not installed locally; e2e tests skip without them).
+- Outward-facing steps deferred for human authorization: see
+  human-attention-needed/001-enable-remote-registry-and-prs.md (push branch / open PRs, create the
+  variables-registry ref, enable CI fan-out, turn on live sync). All are gated and offline-safe by default.
