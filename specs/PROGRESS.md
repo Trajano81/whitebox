@@ -54,10 +54,10 @@ Legend: [ ] todo, [~] in progress, [x] done, [!] blocked (see human-attention-ne
 - [x] tests green (46 unit, 1 skip) + committed
 
 ## Phase 6 - MCP server (spec-006)
-- [ ] whitebox/mcp/server.py (tools incl governance/ingest) + .mcp.json
-- [ ] whitebox/mcp/evaluation.xml (10 Q/A)
-- [ ] tests/unit/test_mcp_tools.py + tests/e2e/test_mcp_e2e.py
-- [ ] tests green + committed
+- [x] whitebox/mcp/tools.py (pure logic, testable) + server.py (FastMCP stdio wiring) + .mcp.json
+- [x] whitebox/mcp/evaluation.xml (read-only Q/A over the demo)
+- [x] tests/unit/test_mcp_tools.py + tests/e2e/test_mcp_e2e.py (skips without mcp)
+- [x] server py_compile OK; tests green (54 unit, 3 skip) + committed
 
 ## Phase 7 - dev guidance skill (spec-007)
 - [ ] .claude/skills/whitebox-dev/SKILL.md (workflow + model-tiering guidance)
