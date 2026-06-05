@@ -106,6 +106,40 @@ class Encoder:
         """Names whose review_status is 'ready_to_model' (the retrain manifest)."""
         return self.list_variables(status="ready_to_model")
 
+    def set_status(self, name, status):
+        """Validated status transition. Blocks promotion to 'ready_to_model' while
+        the variable is flagged 'needs_cleaning'."""
+        if name not in self.registry:
+            raise ValueError(f"unknown variable {name!r}")
+        if status not in VALID_STATUSES:
+            raise ValueError(f"invalid status {status!r}; must be one of {VALID_STATUSES}")
+        rec = self.registry[name]
+        if status == "ready_to_model" and rec["review_status"] == "needs_cleaning":
+            raise ValueError(
+                f"cannot promote {name!r} to ready_to_model while it needs cleaning; "
+                "apply or clear the cleaning proposal first"
+            )
+        rec["review_status"] = status
+        return rec
+
+    def set_profile(self, name, profile):
+        """Attach a profiler result to a variable's record; if it carries
+        data-quality flags, move the variable to 'needs_cleaning'."""
+        if name not in self.registry:
+            self._register_raw(name, dtype=profile.get("dtype", "categorical"))
+        rec = self.registry[name]
+        rec["dtype"] = profile.get("dtype", rec["dtype"])
+        rec["data_quality"] = {
+            "n_missing": profile.get("n_missing"),
+            "missing_pct": profile.get("missing_pct"),
+            "n_unique": profile.get("n_unique"),
+            "odd_tokens": profile.get("odd_tokens", []),
+            "flags": list(profile.get("flags", [])),
+        }
+        if rec["data_quality"]["flags"] and rec["review_status"] == "pending_review":
+            rec["review_status"] = "needs_cleaning"
+        return rec
+
     # ------------------------------------------------------------------
     # name validation (primary key); used by derived-variable creation
     # ------------------------------------------------------------------

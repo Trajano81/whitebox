@@ -26,9 +26,10 @@ Legend: [ ] todo, [~] in progress, [x] done, [!] blocked (see human-attention-ne
 - [x] tests green + committed
 
 ## Phase 2 - variable governance (spec-002)
-- [ ] whitebox/governance/ (SchemaSnapshot/ingest, profiler, proposals, status gate)
-- [ ] tests/unit/test_governance.py, test_variable_manager.py
-- [ ] tests green + committed
+- [x] whitebox/governance/ (ingest diff, profiler, proposals by_bins/by_magnitude, status gate)
+- [x] Encoder.set_status / set_profile; Whitebox profile/propose_cleaning/apply_cleaning/set_status/ingest
+- [x] tests/unit/test_governance.py, test_variable_manager.py
+- [x] tests green (24 unit) + committed
 
 ## Phase 3 - derived variables (spec-003)
 - [ ] add_group / add_combination on Encoder + Whitebox

@@ -277,6 +277,70 @@ class Whitebox:
             raise TypeError(
                 "Not a valid booster. Only xgboost and lightgbm are accepted"
             )
+
+    # ------------------------------------------------------------------
+    # Variable governance (profiling, proposals, status gate, ingestion)
+    # ------------------------------------------------------------------
+    def profile(self, name, missing_tokens=None):
+        """Profile a variable's levels and data-quality, storing the result on its
+        registry record (flags may move it to 'needs_cleaning')."""
+        from .governance import profile_variable
+
+        prof = profile_variable(self.data[name], name=name, missing_tokens=missing_tokens)
+        self.encoder.set_profile(name, prof)
+        return prof
+
+    def propose_cleaning(self, name, method="by_bins", n_bins=10, missing_tokens=None):
+        """Return an editable cleaning/banding proposal for a variable and store it
+        on the registry record. The reviewer edits then calls apply_cleaning."""
+        from .governance import propose_cleaning
+
+        proposal = propose_cleaning(
+            self.data[name],
+            name=name,
+            method=method,
+            n_bins=n_bins,
+            missing_tokens=missing_tokens,
+        )
+        if name in self.encoder.registry:
+            self.encoder.registry[name]["proposal"] = proposal
+        return proposal
+
+    def apply_cleaning(self, name, proposal):
+        """Materialize a (possibly edited) proposal: write the cleaned column,
+        re-encode it, clear cleaning flags, and reset status to pending_review.
+        Note: cleaning prepares a variable for the NEXT retrain; it does not update
+        the current model's SHAP."""
+        from .governance import apply_cleaning as _apply
+
+        cleaned = _apply(self.data, name, proposal)
+        self.data[name] = cleaned
+        self.encoder.encode_column(name)
+        rec = self.encoder.registry.get(name)
+        if rec is not None:
+            rec["data_quality"]["flags"] = []
+            rec["proposal"] = None
+            if rec["review_status"] == "needs_cleaning":
+                rec["review_status"] = "pending_review"
+        return self.data[name]
+
+    def set_status(self, name, status):
+        """Validated status transition (pending_review / ready_to_model /
+        needs_cleaning / excluded)."""
+        return self.encoder.set_status(name, status)
+
+    def trainable_variables(self):
+        """Variables approved for the retrain manifest (review_status ready_to_model)."""
+        return self.encoder.trainable_variables()
+
+    def ingest(self, new_data):
+        """Compare new data's schema to the current feature schema and return a
+        revision report: new / missing / changed variables."""
+        from .governance import diff_schema, schema_snapshot
+
+        old_snap = schema_snapshot(self.data, columns=self.feature_names)
+        new_snap = schema_snapshot(new_data, columns=list(new_data.columns))
+        return diff_schema(old_snap, new_snap)
     
     def univariate_plot(
         self,
