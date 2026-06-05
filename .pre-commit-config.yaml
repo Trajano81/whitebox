@@ -1,0 +1,9 @@
+repos:
+  - repo: local
+    hooks:
+      - id: whitebox-registry-validate
+        name: validate registry.json (global primary key + governance)
+        entry: python -m whitebox.registry.validate registry.json
+        language: system
+        files: ^registry\.json$
+        pass_filenames: false

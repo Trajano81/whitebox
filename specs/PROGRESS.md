@@ -38,10 +38,13 @@ Legend: [ ] todo, [~] in progress, [x] done, [!] blocked (see human-attention-ne
 - [x] tests green (33 unit) + committed
 
 ## Phase 4 - collaborative registry (spec-004)
-- [ ] registry.json schema + validator + pre-commit hook
-- [ ] sync (pull/validate/push to variables-registry ref) - local side
-- [ ] .github/workflows/registry-check.yml + registry-propagate.yml (path-filtered, token-free)
-- [ ] tests green + committed
+- [x] whitebox/registry/validate.py (pure-python; dup names + ready_to_model invariants) + CLI
+- [x] whitebox/registry/sync.py (write/validate local; push GATED offline no-op) + Whitebox.sync_variable
+- [x] .github/workflows/registry-check.yml + registry-propagate.yml (path-filtered, token-free GITHUB_TOKEN)
+- [x] .pre-commit-config.yaml runs the validator
+- [x] tests/unit/test_registry_validate.py, test_registry_sync_offline.py (42 unit) + committed
+- Note: registry.json itself NOT committed to feature branches (lives on variables-registry ref); the
+  ref + remote fan-out are a gated, human-authorized step (see human-attention-needed when ready to enable).
 
 ## Phase 5 - Streamlit report (spec-005)
 - [ ] headless engine (show=False guards)

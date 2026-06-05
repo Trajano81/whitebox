@@ -353,6 +353,20 @@ class Whitebox:
         """Delete a derived variable, freeing its primary-key name."""
         return self.encoder.remove_derived(name)
 
+    def sync_variable(self, name, registry_path="registry.json", repo_dir="."):
+        """Propagate a variable's record to the shared registry. This is the
+        trigger hook for the two propagation events (variable created / new var
+        from raw data). It is OFFLINE-SAFE: it writes/validates the local
+        registry.json and only pushes when WHITEBOX_REGISTRY_SYNC=1 with a remote
+        configured (see whitebox.registry.sync)."""
+        from .registry import push_variable
+
+        if name not in self.encoder.registry:
+            raise ValueError(f"unknown variable {name!r}")
+        return push_variable(
+            name, self.encoder.registry[name], path=registry_path, repo_dir=repo_dir
+        )
+
     def trainable_variables(self):
         """Variables approved for the retrain manifest (review_status ready_to_model)."""
         return self.encoder.trainable_variables()
