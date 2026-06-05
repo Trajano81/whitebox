@@ -15,15 +15,15 @@ Legend: [ ] todo, [~] in progress, [x] done, [!] blocked (see human-attention-ne
 - [x] human-attention-needed/ (+ done/) + README
 - [x] .gitignore updates
 - [x] spec stubs 001-007 written
-- [ ] Phase 0 committed
+- [x] Phase 0 committed (a4b094c)
 
 ## Phase 1 - internal encoding (spec-001)
-- [ ] whitebox/encoding.py (Encoder + unified registry)
-- [ ] core.py wiring (_resolve_feature_names, encoder, auto_encode before model vars, __getstate__/__setstate__)
-- [ ] data_prep.py uses encoder.model_input_column
-- [ ] demo/synthetic_data.py de-externalized (deprecate encode helpers)
-- [ ] tests/unit/test_encoder.py, test_backcompat.py, test_pickle.py
-- [ ] tests green + committed
+- [x] whitebox/encoding.py (Encoder + unified registry)
+- [x] core.py wiring (_resolve_feature_names, encoder, auto_encode before model vars, __getstate__/__setstate__ incl x_data)
+- [x] data_prep.py uses encoder.model_input_column (prep_shap_values + process_categoricals shim)
+- [x] demo/synthetic_data.py de-externalized (deprecate encode helpers, get_demo_data_and_model returns raw)
+- [x] tests/unit/test_encoder.py, test_backcompat.py, test_pickle.py
+- [x] tests green + committed
 
 ## Phase 2 - variable governance (spec-002)
 - [ ] whitebox/governance/ (SchemaSnapshot/ingest, profiler, proposals, status gate)

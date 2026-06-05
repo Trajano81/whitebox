@@ -49,3 +49,44 @@ def messy_df():
 @pytest.fixture
 def feature_names():
     return ["age", "vehicle_value", "region", "mexican_states"]
+
+
+def _encode_for_training(df, feature_names):
+    """Encode categoricals with pd.Categorical codes (matches Encoder.auto_encode)."""
+    cols = {}
+    for c in feature_names:
+        if df[c].dtype == object or str(df[c].dtype) == "category":
+            cols[c] = pd.Categorical(df[c]).codes
+        else:
+            cols[c] = df[c].values
+    return pd.DataFrame(cols, index=df.index)
+
+
+@pytest.fixture
+def trained_model(messy_df, feature_names):
+    import xgboost as xgb
+
+    X = _encode_for_training(messy_df, feature_names)
+    dtrain = xgb.DMatrix(
+        X,
+        label=messy_df["claim_count"],
+        weight=messy_df["exposure"],
+        feature_names=feature_names,
+    )
+    params = {"objective": "count:poisson", "max_depth": 3, "eta": 0.3, "verbosity": 0}
+    return xgb.train(params, dtrain, num_boost_round=15)
+
+
+@pytest.fixture
+def wb(messy_df, trained_model, feature_names):
+    from whitebox import Whitebox
+
+    return Whitebox(
+        data=messy_df.copy(),
+        model=trained_model,
+        weight_col="exposure",
+        actuals_col="claim_count",
+        feature_names=feature_names,
+        link_fn="poisson",
+        verbose=False,
+    )
