@@ -47,10 +47,11 @@ Legend: [ ] todo, [~] in progress, [x] done, [!] blocked (see human-attention-ne
   ref + remote fan-out are a gated, human-authorized step (see human-attention-needed when ready to enable).
 
 ## Phase 5 - Streamlit report (spec-005)
-- [ ] headless engine (show=False guards)
-- [ ] whitebox/report/launcher.py + app.py (one-way, two-way, data-review, variable-manager)
-- [ ] tests/unit/test_engine_headless.py + tests/e2e/test_report_e2e.py
-- [ ] tests green + committed
+- [x] headless engine (show kwarg threaded; guarded show(p) x3; guarded output_notebook)
+- [x] whitebox/report/launcher.py + app.py (one-way, two-way, data-review, variable-manager)
+- [x] Whitebox.launch_report
+- [x] tests/unit/test_engine_headless.py, test_report_launcher.py + tests/e2e/test_report_e2e.py (skips w/o streamlit)
+- [x] tests green (46 unit, 1 skip) + committed
 
 ## Phase 6 - MCP server (spec-006)
 - [ ] whitebox/mcp/server.py (tools incl governance/ingest) + .mcp.json

@@ -90,3 +90,49 @@ def wb(messy_df, trained_model, feature_names):
         link_fn="poisson",
         verbose=False,
     )
+
+
+@pytest.fixture
+def clean_df():
+    """A larger, clean dataset (no messy tokens) for plotting-engine tests."""
+    rng = np.random.RandomState(7)
+    n = 1500
+    df = pd.DataFrame(
+        {
+            "age": rng.normal(45, 15, n).clip(18, 85),
+            "vehicle_value": rng.lognormal(10, 0.5, n).clip(5000, 150000),
+            "region": rng.choice(["North", "South", "East", "West"], n).astype(object),
+            "vehicle_type": rng.choice(["Sedan", "SUV", "Truck"], n).astype(object),
+            "exposure": rng.uniform(0.5, 1.0, n),
+        }
+    )
+    rate = 0.1 * np.exp(-0.01 * (df["age"] - 40))
+    df["claim_count"] = rng.poisson(rate * df["exposure"]).astype(float)
+    return df
+
+
+@pytest.fixture
+def wb_clean(clean_df):
+    import xgboost as xgb
+
+    from whitebox import Whitebox
+
+    fn = ["age", "vehicle_value", "region", "vehicle_type"]
+    X = _encode_for_training(clean_df, fn)
+    dtrain = xgb.DMatrix(
+        X, label=clean_df["claim_count"], weight=clean_df["exposure"], feature_names=fn
+    )
+    model = xgb.train(
+        {"objective": "count:poisson", "max_depth": 3, "eta": 0.3, "verbosity": 0},
+        dtrain,
+        num_boost_round=20,
+    )
+    return Whitebox(
+        data=clean_df.copy(),
+        model=model,
+        weight_col="exposure",
+        actuals_col="claim_count",
+        feature_names=fn,
+        link_fn="poisson",
+        verbose=False,
+    )

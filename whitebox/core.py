@@ -367,6 +367,14 @@ class Whitebox:
             name, self.encoder.registry[name], path=registry_path, repo_dir=repo_dir
         )
 
+    def launch_report(self, port=8501, export_dir=None):
+        """Launch the interactive Streamlit report (one-way / two-way / data review
+        / variable manager). Requires the optional 'report' extra
+        (pip install 'whitebox[report]')."""
+        from .report import launch_report
+
+        return launch_report(self, port=port, export_dir=export_dir)
+
     def trainable_variables(self):
         """Variables approved for the retrain manifest (review_status ready_to_model)."""
         return self.encoder.trainable_variables()
@@ -414,6 +422,7 @@ class Whitebox:
         glmindic_cols=None,
         engine=None,
         joinshaps_error=True,
+        show=True,
         height=500,
         width=1000,
         **kwargs
@@ -554,6 +563,7 @@ class Whitebox:
         kwargs["joinshaps"] = joinshaps
         kwargs["glmindic_cols"] = glmindic_cols
         kwargs["joinshaps_error"] = joinshaps_error
+        kwargs["show"] = show
         kwargs["height"] = height
         kwargs["width"] = width
 
@@ -603,6 +613,7 @@ class Whitebox:
         glmindic_cols=None,
         joinshaps=None,
         save_plot=None,
+        show=True,
         width=1000,
         height=500,
         **kwargs
@@ -748,6 +759,7 @@ class Whitebox:
             glmindic_cols,
             joinshaps,
             save_plot,
+            show=show,
             **kwargs
         )
 

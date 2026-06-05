@@ -11,8 +11,13 @@ from ..utils import *
 import pandas as pd
 import numpy as np
 
-bokeh.io.reset_output()
-bokeh.io.output_notebook()
+# Enable inline notebook rendering when available. Guarded so importing the engine
+# in a headless context (e.g. the Streamlit subprocess) does not error.
+try:
+    bokeh.io.reset_output()
+    bokeh.io.output_notebook()
+except Exception:
+    pass
 
 
 class BokehEngine(PlotEngine):
@@ -282,7 +287,8 @@ class BokehEngine(PlotEngine):
         if "save_plot" in kwargs.keys() and kwargs["save_plot"] is not None:
             output_file(kwargs["save_plot"] + var_name + ".html", title=var_name)
 
-        show(p)
+        if kwargs.get("show", True):
+            show(p)
         return p
     
     def sort_banding_levels(self, data_to_plot_var):
@@ -654,7 +660,8 @@ class BokehEngine(PlotEngine):
                 save_plot + var1 + "_x_" + var2 + ".html", title=var1 + "_x_" + var2
             )
 
-        show(p)
+        if kwargs.get("show", True):
+            show(p)
         return p
     
     def compare(self, var_name, merged_data, merged_shap_points, **kwargs):
@@ -849,5 +856,6 @@ class BokehEngine(PlotEngine):
         if "save_plot" in kwargs.keys() and kwargs["save_plot"] is not None:
             output_file(kwargs["save_plot"] + var_name + ".html", title=var_name)
 
-        show(p)
+        if kwargs.get("show", True):
+            show(p)
         return p
