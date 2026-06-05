@@ -60,3 +60,14 @@ demo/*.html
 
 # Claude Code
 CLAUDE.md
+
+# Agent secrets (Pillar E) - hold confidential keys, never commit (except the example)
+.venv_agent/*
+*.env
+!.venv_agent/.env.example
+
+# Ralph loop session state (paulosalvatore/ralph-loop)
+.claude/*.local*
+
+# Streamlit / report exports
+whitebox_report_exports/
