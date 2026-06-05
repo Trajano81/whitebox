@@ -227,6 +227,98 @@ class Encoder:
         return self.category_mappings
 
     # ------------------------------------------------------------------
+    # derived variables (group / combine)
+    # ------------------------------------------------------------------
+    def add_group(self, name, source, level_map, default=None, created_by="user",
+                  status="pending_review"):
+        """Create a grouped derived variable: map `source` levels via `level_map`
+        into fewer groups. Uncovered levels go to `default` (or pass through with a
+        verbose note). Materializes `name` + `{name}_encoded`, registers it."""
+        self.validate_name(name)
+        if source not in self.data.columns:
+            raise ValueError(f"source variable {source!r} not found")
+        src = self.data[source].astype(object)
+        uncovered = sorted(
+            {v for v in src.dropna().unique() if v not in level_map}
+        )
+        if uncovered and default is None and self.verbose:
+            print(
+                f"add_group({name!r}): {len(uncovered)} source level(s) not in level_map "
+                f"kept as-is: {uncovered[:10]}"
+            )
+
+        def _map(v):
+            if v in level_map:
+                return level_map[v]
+            return default if default is not None else v
+
+        self.data[name] = src.map(_map)
+        codes, mapping = self._encode_series(self.data[name])
+        self.data[f"{name}_encoded"] = codes
+        self.category_mappings[name] = mapping
+        self.registry[name] = {
+            "origin": "derived_group",
+            "created_by": created_by,
+            "review_status": status,
+            "dtype": "categorical",
+            "data_quality": {},
+            "proposal": None,
+            "kind": "group",
+            "sources": [source],
+            "mapping": mapping,
+            "level_map": dict(level_map),
+        }
+        return name
+
+    def add_combination(self, name, sources, sep=DEFAULT_COMBINE_SEP,
+                        created_by="user", status="pending_review"):
+        """Create a combined derived variable from 2+ source columns, joining their
+        labels with `sep` (e.g. North_x_SUV). Materializes `name` + `{name}_encoded`."""
+        self.validate_name(name)
+        if sources is None or len(sources) < 2:
+            raise ValueError("add_combination requires at least 2 source variables")
+        for s in sources:
+            if s not in self.data.columns:
+                raise ValueError(f"source variable {s!r} not found")
+        combined = self.data[sources[0]].astype(str)
+        for s in sources[1:]:
+            combined = combined.str.cat(self.data[s].astype(str), sep=sep)
+        self.data[name] = combined
+        if self.verbose and combined.nunique() > 50:
+            print(
+                f"add_combination({name!r}): high cardinality ({combined.nunique()} levels); "
+                "consider grouping the sources first"
+            )
+        codes, mapping = self._encode_series(self.data[name])
+        self.data[f"{name}_encoded"] = codes
+        self.category_mappings[name] = mapping
+        self.registry[name] = {
+            "origin": "derived_combine",
+            "created_by": created_by,
+            "review_status": status,
+            "dtype": "categorical",
+            "data_quality": {},
+            "proposal": None,
+            "kind": "combine",
+            "sources": list(sources),
+            "mapping": mapping,
+            "sep": sep,
+        }
+        return name
+
+    def remove_derived(self, name):
+        """Delete a derived variable: drop its columns, mapping, and registry entry,
+        freeing the primary-key name."""
+        if name not in self.registry or not self.is_derived(name):
+            raise ValueError(f"{name!r} is not a derived variable")
+        for col in (name, f"{name}_encoded"):
+            if col in self.data.columns:
+                del self.data[col]
+        self.category_mappings.pop(name, None)
+        del self.registry[name]
+        return name
+
+    # ------------------------------------------------------------------
     # lookups used by the model / plotting layers
     # ------------------------------------------------------------------
     def model_input_column(self, col):

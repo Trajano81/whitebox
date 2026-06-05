@@ -32,10 +32,10 @@ Legend: [ ] todo, [~] in progress, [x] done, [!] blocked (see human-attention-ne
 - [x] tests green (24 unit) + committed
 
 ## Phase 3 - derived variables (spec-003)
-- [ ] add_group / add_combination on Encoder + Whitebox
-- [ ] data_prep _derived_shap_series + plot wiring
-- [ ] tests/unit/test_derived_group.py, test_derived_combine.py
-- [ ] tests green + committed
+- [x] add_group / add_combination / remove_derived on Encoder + Whitebox; plottable_variables
+- [x] data_prep _derived_shap_series + univariate/bivariate validation + SHAP wiring
+- [x] tests/unit/test_derived_group.py, test_derived_combine.py
+- [x] tests green (33 unit) + committed
 
 ## Phase 4 - collaborative registry (spec-004)
 - [ ] registry.json schema + validator + pre-commit hook

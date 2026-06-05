@@ -46,12 +46,24 @@ class DataPrep:
             print("Reading shapley from:" + out_file)
             self.whitebox.shap_df = pd.read_pickle(out_file)
     
+    def _derived_shap_series(self, name):
+        """Synthesize SHAP for a derived variable from its source feature(s):
+        a single source uses that feature's SHAP; multiple sources sum row-wise.
+        Grouping along the derived levels happens later via groupby on the x-axis.
+        """
+        if self.whitebox.shap_df is None:
+            self.prep_shap_values()
+        sources = self.whitebox.encoder.source_features(name)
+        if len(sources) == 1:
+            return self.whitebox.shap_df[sources[0]]
+        return self.whitebox.shap_df[sources].sum(axis=1)
+
     def prep_univariate_data(self, var_name, kwargs):
         """
         Creates univariate data to plot
         """
         if kwargs["shap"] is not None and (
-            var_name not in self.whitebox.feature_names
+            var_name not in self.whitebox.plottable_variables()
             and kwargs["joinshaps"] is None
             and kwargs["shap"]
         ):
@@ -174,7 +186,10 @@ class DataPrep:
                 self.prep_shap_values()
             # weighted shap
             if kwargs["joinshaps"] is None or len(kwargs["joinshaps"]) == 0:
-                shap_vals = self.whitebox.shap_df[var_name].values
+                if self.whitebox.encoder.is_derived(var_name):
+                    shap_vals = self._derived_shap_series(var_name).values
+                else:
+                    shap_vals = self.whitebox.shap_df[var_name].values
             else:
                 valid_shaps = self.get_valid_shaps(kwargs["joinshaps"])
                 shap_vals = self.whitebox.shap_df[valid_shaps].prod(axis=1).values
@@ -503,19 +518,20 @@ class DataPrep:
         glmindic_cols=None,
         joinshaps=None,
     ):
-        if var1 not in self.whitebox.feature_names:
+        plottable = self.whitebox.plottable_variables()
+        if var1 not in plottable:
             raise ValueError(
                 "The variable "
                 + var1
-                + " is not in the model the availables variables are "
-                + str(self.whitebox.feature_names)
+                + " is not available to plot, the available variables are "
+                + str(plottable)
             )
-        if var2 not in self.whitebox.feature_names:
+        if var2 not in plottable:
             raise ValueError(
                 "The variable "
                 + var2
-                + " is not in the model the availables variables are "
-                + str(self.whitebox.feature_names)
+                + " is not available to plot, the available variables are "
+                + str(plottable)
             )
 
         data_to_plot = pd.DataFrame()
@@ -557,12 +573,14 @@ class DataPrep:
                     * data_to_plot["weight"]
                 ).reset_index(drop=True)
             else:
-                data_to_plot["shap"] = self.whitebox.shap_df[var1].reset_index(
-                    drop=True
-                )
+                if self.whitebox.encoder.is_derived(var1):
+                    var1_shap = self._derived_shap_series(var1)
+                else:
+                    var1_shap = self.whitebox.shap_df[var1]
+                data_to_plot["shap"] = var1_shap.reset_index(drop=True)
                 data_to_plot["shap_wgt"] = (
-                    self.whitebox.shap_df[var1] * data_to_plot["weight"]
-                ).reset_index(drop=True)
+                    var1_shap.values * data_to_plot["weight"].values
+                )
         
         if glm:
             if glmindic_cols is not None:

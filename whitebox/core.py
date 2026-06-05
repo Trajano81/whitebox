@@ -329,6 +329,30 @@ class Whitebox:
         needs_cleaning / excluded)."""
         return self.encoder.set_status(name, status)
 
+    # ------------------------------------------------------------------
+    # Derived variables (group / combine) + plottable set
+    # ------------------------------------------------------------------
+    def plottable_variables(self):
+        """Original features plus derived variables (all selectable for plotting)."""
+        derived = [n for n in self.encoder.registry if self.encoder.is_derived(n)]
+        return list(self.feature_names) + derived
+
+    def add_group(self, name, source, level_map, default=None, created_by="user"):
+        """Create a grouped derived variable (see Encoder.add_group)."""
+        self.encoder.add_group(
+            name, source, level_map, default=default, created_by=created_by
+        )
+        return self
+
+    def add_combination(self, name, sources, sep="_x_", created_by="user"):
+        """Create a combined derived variable (see Encoder.add_combination)."""
+        self.encoder.add_combination(name, sources, sep=sep, created_by=created_by)
+        return self
+
+    def remove_variable(self, name):
+        """Delete a derived variable, freeing its primary-key name."""
+        return self.encoder.remove_derived(name)
+
     def trainable_variables(self):
         """Variables approved for the retrain manifest (review_status ready_to_model)."""
         return self.encoder.trainable_variables()
