@@ -589,8 +589,19 @@ class DataPrep:
                     * data_to_plot["weight"]
                 ).reset_index(drop=True)
             else:
+                # Resolve the GLM column for var1, honoring glm_var_map when the GLM
+                # export uses a different column name (e.g. "age" -> "age_band").
+                glm_col = var1
+                if self.whitebox.glm_var_map and var1 in self.whitebox.glm_var_map:
+                    glm_col = self.whitebox.glm_var_map[var1]
+                if glm_col not in self.whitebox.glm_df.columns:
+                    raise ValueError(
+                        f"GLM column for '{var1}' not found in glm_df (looked for "
+                        f"'{glm_col}'). Use glm_var_map to map GBM variable names to GLM "
+                        f"column names. Available: {list(self.whitebox.glm_df.columns)}"
+                    )
                 data_to_plot["glm_wgt"] = (
-                    self.whitebox.glm_df[var1] * data_to_plot["weight"]
+                    self.whitebox.glm_df[glm_col] * data_to_plot["weight"]
                 ).reset_index(drop=True)
 
         if actuals:
