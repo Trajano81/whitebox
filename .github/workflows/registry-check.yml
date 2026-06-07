@@ -17,4 +17,4 @@ jobs:
         with:
           python-version: "3.11"
       - name: Validate registry.json
-        run: python -m whitebox.registry.validate registry.json
+        run: python whitebox/registry/validate.py registry.json
