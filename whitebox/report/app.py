@@ -235,8 +235,9 @@ def page_one_way(wb):
 def page_two_way(wb):
     st.header("Two-way (bivariate)")
     options = wb.plottable_variables()
-    var1 = st.selectbox("Variable 1", options, key="bv1")
-    var2 = st.selectbox("Variable 2", options, index=min(1, len(options) - 1), key="bv2")
+    vcol1, vcol2 = st.columns(2)
+    var1 = vcol1.selectbox("Variable 1", options, key="bv1")
+    var2 = vcol2.selectbox("Variable 2", options, index=min(1, len(options) - 1), key="bv2")
 
     title_col, eff_col, pred_col = st.columns([1, 2, 2], vertical_alignment="center")
     title_col.markdown("**Series to show**")
