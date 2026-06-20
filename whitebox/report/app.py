@@ -70,31 +70,32 @@ def page_one_way(wb):
     actuals = c4.checkbox("Actuals", value=False)
     weight = c4.checkbox("Weight", value=True)
 
-    with st.expander("Plot options", expanded=False):
-        st.markdown("**Axis main options**")
-        oc1, oc2, oc3 = st.columns(3)
-        rebase = oc1.checkbox("Rebase", value=True)
-        infinity_lower = oc2.checkbox("Infinity lower band", value=True)
-        infinity_higher = oc3.checkbox("Infinity higher band", value=True)
-        bc1, bc2, bc3 = st.columns(3)
-        nlevels = bc1.number_input("Bands (numeric, nlevels; 0 = auto)", 0, 100, 0)
-        pstart = bc2.number_input("Percentile start", 0, 100, 10)
-        pfinish = bc3.number_input("Percentile finish", 0, 100, 90)
-        rc1, rc2, rc3 = st.columns(3)
-        start = rc1.text_input("Start (override)", value="")
-        finish = rc2.text_input("Finish (override)", value="")
-        stepsize = rc3.text_input("Stepsize (override)", value="")
-        yc1, yc2 = st.columns(2)
-        y_min = yc1.text_input("Y axis min", value="")
-        y_max = yc2.text_input("Y axis max", value="")
+    st.divider()
+    st.markdown("**Axis main options**")
+    oc1, oc2, oc3 = st.columns(3)
+    rebase = oc1.checkbox("Rebase", value=True)
+    infinity_lower = oc2.checkbox("Infinity lower band", value=True)
+    infinity_higher = oc3.checkbox("Infinity higher band", value=True)
+    bc1, bc2, bc3 = st.columns(3)
+    nlevels = bc1.number_input("Bands (numeric, nlevels; 0 = auto)", 0, 100, 0)
+    pstart = bc2.number_input("Percentile start", 0, 100, 10)
+    pfinish = bc3.number_input("Percentile finish", 0, 100, 90)
+    rc1, rc2, rc3 = st.columns(3)
+    start = rc1.text_input("Start (override)", value="")
+    finish = rc2.text_input("Finish (override)", value="")
+    stepsize = rc3.text_input("Stepsize (override)", value="")
+    yc1, yc2 = st.columns(2)
+    y_min = yc1.text_input("Y axis min", value="")
+    y_max = yc2.text_input("Y axis max", value="")
 
-        st.markdown("**SHAP options**")
-        sc1, sc2 = st.columns(2)
-        n_shap_points = sc1.number_input("SHAP points sample (n)", 100, 200000, 1000, step=100)
-        ci_z = sc2.number_input("SD band width (ci_z)", 0.0, 5.0, 2.0, step=0.5)
+    st.markdown("**SHAP options**")
+    sc1, sc2 = st.columns(2)
+    n_shap_points = sc1.number_input("SHAP points sample (n)", 100, 200000, 1000, step=100)
+    ci_z = sc2.number_input("SD band width (ci_z)", 0.0, 5.0, 2.0, step=0.5)
 
-        st.markdown("**Labels**")
-        plot_name = st.text_input("Plot title", value="Univariate Plot")
+    st.markdown("**Labels**")
+    plot_name = st.text_input("Plot title", value="Univariate Plot")
+    st.divider()
 
     if st.button("Render", key="render_one"):
         kwargs = dict(
@@ -142,21 +143,22 @@ def page_two_way(wb):
     gbm_pred = c3.checkbox("GBM prediction", value=False, key="bv_gbm")
     actuals = c4.checkbox("Actuals", value=False, key="bv_act")
 
-    with st.expander("Plot options", expanded=False):
-        st.markdown("**Axis main options**")
-        rebase = st.checkbox("Rebase", value=True, key="bv_rebase")
-        st.caption("Bands per variable (numeric; 0 = auto)")
-        v1c1, v1c2, v1c3 = st.columns(3)
-        nlevels_var1 = v1c1.number_input("var1 nlevels", 0, 100, 0, key="bv_nl1")
-        ps1 = v1c2.number_input("var1 percentile start", 0, 100, 1, key="bv_ps1")
-        pf1 = v1c3.number_input("var1 percentile finish", 0, 100, 99, key="bv_pf1")
-        v2c1, v2c2, v2c3 = st.columns(3)
-        nlevels_var2 = v2c1.number_input("var2 nlevels", 0, 100, 0, key="bv_nl2")
-        ps2 = v2c2.number_input("var2 percentile start", 0, 100, 1, key="bv_ps2")
-        pf2 = v2c3.number_input("var2 percentile finish", 0, 100, 99, key="bv_pf2")
+    st.divider()
+    st.markdown("**Axis main options**")
+    rebase = st.checkbox("Rebase", value=True, key="bv_rebase")
+    st.caption("Bands per variable (numeric; 0 = auto)")
+    v1c1, v1c2, v1c3 = st.columns(3)
+    nlevels_var1 = v1c1.number_input("var1 nlevels", 0, 100, 0, key="bv_nl1")
+    ps1 = v1c2.number_input("var1 percentile start", 0, 100, 1, key="bv_ps1")
+    pf1 = v1c3.number_input("var1 percentile finish", 0, 100, 99, key="bv_pf1")
+    v2c1, v2c2, v2c3 = st.columns(3)
+    nlevels_var2 = v2c1.number_input("var2 nlevels", 0, 100, 0, key="bv_nl2")
+    ps2 = v2c2.number_input("var2 percentile start", 0, 100, 1, key="bv_ps2")
+    pf2 = v2c3.number_input("var2 percentile finish", 0, 100, 99, key="bv_pf2")
 
-        st.markdown("**Labels**")
-        plot_title = st.text_input("Plot title", value="Bivariate plot", key="bv_title")
+    st.markdown("**Labels**")
+    plot_title = st.text_input("Plot title", value="Bivariate plot", key="bv_title")
+    st.divider()
 
     if st.button("Render", key="render_two"):
         kwargs = dict(
@@ -223,6 +225,8 @@ def page_data_review(wb):
                 "`\"\"`, `NA`, `.`, `null`, `NaN` (case and whitespace insensitive).\n"
                 "- **missing_pct**: `n_missing` as a percentage of `n`.\n"
                 "- **n_unique**: distinct non-missing values.\n"
+                "- **mean**: arithmetic mean of the non-missing values (numeric variables only; null for categorical).\n"
+                "- **max**: maximum of the non-missing values (numeric variables only; null for categorical).\n"
                 "- **top_levels**: the 20 most frequent categories with count and pct "
                 "(empty for numeric variables).\n"
                 "- **odd_tokens**: distinct category values with odd characters (anything "
