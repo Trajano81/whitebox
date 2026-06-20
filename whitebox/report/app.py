@@ -27,8 +27,16 @@ def load_wb(path):
         return pickle.load(f)
 
 
-def render(fig, key, height=560):
-    """Embed a Bokeh figure as standalone HTML and return the HTML string."""
+def render(fig, key, height=640):
+    """Embed a Bokeh figure as standalone HTML and return the HTML string.
+
+    The figure stretches to the available width so the right-side legend is not
+    clipped, and the iframe is given generous height.
+    """
+    try:
+        fig.sizing_mode = "stretch_width"
+    except Exception:
+        pass
     html = file_html(fig, CDN, key)
     components.html(html, height=height, scrolling=True)
     return html
@@ -165,6 +173,9 @@ def page_variable_manager(wb):
 
 
 def main():
+    # Wide layout uses the full window width (the default centered column is too
+    # narrow for the plots + legend). Must be the first Streamlit call.
+    st.set_page_config(page_title="Whitebox report", layout="wide")
     if not PKL_PATH:
         st.error("No Whitebox pickle provided.")
         return
