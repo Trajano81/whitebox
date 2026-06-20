@@ -103,6 +103,44 @@ def _optional_float(text):
     return float(text) if text else None
 
 
+def build_derived_spec(is_numeric, rows):
+    """Translate Variable-manager rule rows into add_binned / add_group kwargs.
+
+    Pure (no Streamlit) so it is unit-testable. For a numeric source, `rows` is a list
+    of contiguous bands ``{"lower": float, "upper": float}``; the result carries pd.cut
+    `edges` (the first lower plus every upper) and ``"lo to hi"`` `labels`. For a
+    categorical source, `rows` is ``{"value": str, "to": str}`` and the result carries a
+    `level_map` (empty target -> passthrough). Raises ValueError on empty or
+    non-increasing input.
+    """
+    if is_numeric:
+        bands = []
+        for r in rows:
+            lo, hi = r.get("lower"), r.get("upper")
+            if lo is None or hi is None:
+                continue
+            bands.append((float(lo), float(hi)))
+        if not bands:
+            raise ValueError("define at least one numeric band")
+        bands.sort(key=lambda t: t[0])
+        edges = [bands[0][0]] + [hi for _, hi in bands]
+        if any(edges[i] >= edges[i + 1] for i in range(len(edges) - 1)):
+            raise ValueError("band bounds must strictly increase (no gaps or overlaps)")
+        labels = [f"{lo:g} to {hi:g}" for lo, hi in bands]
+        return {"kind": "band", "edges": edges, "labels": labels}
+
+    level_map = {}
+    for r in rows:
+        val = r.get("value")
+        if val is None:
+            continue
+        to = (r.get("to") or "").strip()
+        level_map[str(val)] = to if to else str(val)
+    if not level_map:
+        raise ValueError("no categories to map")
+    return {"kind": "group", "level_map": level_map}
+
+
 @st.cache_data(show_spinner="Rendering plot...")
 def _univariate_html(_wb, _pkl_path, var, opts):
     """Build the one-way plot HTML for (var, opts) and cache it.
@@ -133,6 +171,35 @@ def _bivariate_html(_wb, _pkl_path, var1, var2, opts):
     kwargs = dict(opts)
     fig = _wb.bivariate_plot(var1, var2, **kwargs)
     return figure_html(fig, f"{var1}_x_{var2}")
+
+
+_PREVIEW_TMP = "vm_preview_tmp"
+
+
+@st.cache_data(show_spinner="Rendering preview...")
+def _preview_html(_wb, _pkl_path, src, spec_json):
+    """Render the prospective derived variable (actuals only) before it is created.
+
+    The variable is materialized under a throwaway name, plotted with `univariate_plot`
+    (actuals on, SHAP off), and removed again in a `finally` so the loaded Whitebox is
+    left untouched. Cached on (src, spec_json) so it only rebuilds when the rules change.
+    """
+    spec = json.loads(spec_json)
+    if _PREVIEW_TMP in _wb.encoder.registry:
+        _wb.remove_variable(_PREVIEW_TMP)
+    try:
+        if spec["kind"] == "band":
+            _wb.add_binned(_PREVIEW_TMP, src, spec["edges"], labels=spec["labels"])
+        else:
+            _wb.add_group(_PREVIEW_TMP, src, spec["level_map"])
+        fig = _wb.univariate_plot(
+            _PREVIEW_TMP, actuals=True, shap=False, weight=False, rebase=False,
+            plot_name="Preview (actuals)", show=False,
+        )
+        return figure_html(fig, "vm_preview")
+    finally:
+        if _PREVIEW_TMP in _wb.encoder.registry:
+            _wb.remove_variable(_PREVIEW_TMP)
 
 
 def save_summary(html, filename):
@@ -235,9 +302,14 @@ def page_one_way(wb):
 def page_two_way(wb):
     st.header("Two-way (bivariate)")
     options = wb.plottable_variables()
+    none_opts = [None] + options
+    _fmt = lambda v: "(none)" if v is None else v
     vcol1, vcol2 = st.columns(2)
-    var1 = vcol1.selectbox("Variable 1", options, key="bv1")
-    var2 = vcol2.selectbox("Variable 2", options, index=min(1, len(options) - 1), key="bv2")
+    # Variable 1 defaults to the first variable; Variable 2 defaults to (none).
+    var1 = vcol1.selectbox(
+        "Variable 1", none_opts, index=1 if options else 0, format_func=_fmt, key="bv1"
+    )
+    var2 = vcol2.selectbox("Variable 2", none_opts, index=0, format_func=_fmt, key="bv2")
 
     title_col, eff_col, pred_col = st.columns([1, 2, 2], vertical_alignment="center")
     title_col.markdown("**Series to show**")
@@ -271,28 +343,34 @@ def page_two_way(wb):
         st.markdown("**Labels**")
         plot_title = st.text_input("Plot title", value="Bivariate plot", key="bv_title")
 
-    # Auto-render: build kwargs from the current widget values and draw on every
-    # rerun. _bivariate_html caches on (var1, var2, opts) so a repeated combination
-    # is instant; there is no Render button.
-    kwargs = dict(
-        shap=shap, glm=glm, gbm_pred=gbm_pred, actuals=actuals, rebase=rebase,
-        percentile_start_var1=int(ps1), percentile_finish_var1=int(pf1),
-        percentile_start_var2=int(ps2), percentile_finish_var2=int(pf2),
-        plot_title=plot_title, show=False,
-    )
-    if int(nlevels_var1) > 0:
-        kwargs["nlevels_var1"] = int(nlevels_var1)
-    if int(nlevels_var2) > 0:
-        kwargs["nlevels_var2"] = int(nlevels_var2)
-
-    # Sorted (name, value) tuple is the stable, hashable cache key for the options.
-    opts = tuple(sorted(kwargs.items()))
-    try:
-        st.session_state["two_html"] = _bivariate_html(wb, PKL_PATH, var1, var2, opts)
-        st.session_state["two_name"] = f"bivariate_{var1}_x_{var2}.html"
-    except Exception as e:  # noqa: BLE001
+    # A two-way plot needs both variables. While either is "(none)", show a hint
+    # and draw nothing.
+    if var1 is None or var2 is None:
         st.session_state.pop("two_html", None)
-        st.error(f"Render failed: {e}")
+        st.info("Pick both Variable 1 and Variable 2 to render a two-way plot.")
+    else:
+        # Auto-render: build kwargs from the current widget values and draw on every
+        # rerun. _bivariate_html caches on (var1, var2, opts) so a repeated combination
+        # is instant; there is no Render button.
+        kwargs = dict(
+            shap=shap, glm=glm, gbm_pred=gbm_pred, actuals=actuals, rebase=rebase,
+            percentile_start_var1=int(ps1), percentile_finish_var1=int(pf1),
+            percentile_start_var2=int(ps2), percentile_finish_var2=int(pf2),
+            plot_title=plot_title, show=False,
+        )
+        if int(nlevels_var1) > 0:
+            kwargs["nlevels_var1"] = int(nlevels_var1)
+        if int(nlevels_var2) > 0:
+            kwargs["nlevels_var2"] = int(nlevels_var2)
+
+        # Sorted (name, value) tuple is the stable, hashable cache key for the options.
+        opts = tuple(sorted(kwargs.items()))
+        try:
+            st.session_state["two_html"] = _bivariate_html(wb, PKL_PATH, var1, var2, opts)
+            st.session_state["two_name"] = f"bivariate_{var1}_x_{var2}.html"
+        except Exception as e:  # noqa: BLE001
+            st.session_state.pop("two_html", None)
+            st.error(f"Render failed: {e}")
 
     if st.session_state.get("two_html"):
         show_html(st.session_state["two_html"])
