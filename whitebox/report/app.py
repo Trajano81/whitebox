@@ -92,15 +92,23 @@ def page_one_way(wb):
     var = st.selectbox("Variable", wb.plottable_variables())
 
     st.markdown("**Series to show**")
-    c1, c2, c3, c4, _ = st.columns([1, 1, 1, 1, 2])
-    shap = c1.checkbox("SHAP", value=True)
-    shap_points = c1.checkbox("SHAP points", value=False)
-    shap_sd = c2.checkbox("SHAP +/- SD", value=False)
-    glm = c2.checkbox("GLM indication", value=False)
-    glm_pred = c3.checkbox("GLM prediction", value=False)
-    gbm_pred = c3.checkbox("GBM prediction", value=False)
-    actuals = c4.checkbox("Actuals", value=False)
-    weight = c4.checkbox("Weight", value=True)
+    eff_col, pred_col = st.columns(2)
+    with eff_col, st.container(border=True):
+        st.caption("Model effects")
+        e1, e2, e3 = st.columns(3)
+        shap = e1.checkbox("SHAP", value=True)
+        shap_points = e2.checkbox("SHAP points", value=False)
+        # SHAP +/- SD only makes sense with the average SHAP line.
+        shap_sd = e3.checkbox("SHAP +/- SD", value=False, disabled=not shap)
+        e4, e5, _e6 = st.columns(3)
+        glm = e4.checkbox("GLM indication", value=False)
+        weight = e5.checkbox("Weight", value=True)
+    with pred_col, st.container(border=True):
+        st.caption("Predictions and actuals")
+        p1, p2, p3 = st.columns(3)
+        glm_pred = p1.checkbox("GLM prediction", value=False)
+        gbm_pred = p2.checkbox("GBM prediction", value=False)
+        actuals = p3.checkbox("Actuals", value=False)
 
     st.markdown("**Axis main options**")
     oc1, oc2, oc3, _ = st.columns([1, 1, 1, 3])
@@ -142,7 +150,7 @@ def page_one_way(wb):
         n_shap_points=int(n_shap_points), ci_z=float(ci_z),
         plot_name=plot_name, show=False,
     )
-    if shap_sd:
+    if shap and shap_sd:
         kwargs["shap_sd"] = True
     if int(nlevels) > 0:
         kwargs["nlevels"] = int(nlevels)
@@ -176,11 +184,17 @@ def page_two_way(wb):
     var2 = st.selectbox("Variable 2", options, index=min(1, len(options) - 1), key="bv2")
 
     st.markdown("**Series to show**")
-    c1, c2, c3, c4, _ = st.columns([1, 1, 1, 1, 2])
-    shap = c1.checkbox("SHAP", value=True, key="bv_shap")
-    glm = c2.checkbox("GLM indication", value=False, key="bv_glm")
-    gbm_pred = c3.checkbox("GBM prediction", value=False, key="bv_gbm")
-    actuals = c4.checkbox("Actuals", value=False, key="bv_act")
+    eff_col, pred_col = st.columns(2)
+    with eff_col, st.container(border=True):
+        st.caption("Model effects")
+        e1, e2 = st.columns(2)
+        shap = e1.checkbox("SHAP", value=True, key="bv_shap")
+        glm = e2.checkbox("GLM indication", value=False, key="bv_glm")
+    with pred_col, st.container(border=True):
+        st.caption("Predictions and actuals")
+        p1, p2 = st.columns(2)
+        gbm_pred = p1.checkbox("GBM prediction", value=False, key="bv_gbm")
+        actuals = p2.checkbox("Actuals", value=False, key="bv_act")
 
     st.markdown("**Axis main options**")
     rebase = st.checkbox("Rebase", value=True, key="bv_rebase")
