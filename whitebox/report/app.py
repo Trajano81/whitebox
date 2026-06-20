@@ -147,8 +147,8 @@ def page_one_way(wb):
     st.header("One-way (univariate)")
     var = st.selectbox("Variable", wb.plottable_variables())
 
-    st.markdown("**Series to show**")
-    eff_col, pred_col = st.columns([3, 2])
+    title_col, eff_col, pred_col = st.columns([1, 3, 2], vertical_alignment="center")
+    title_col.markdown("**Series to show**")
     with eff_col, st.container(border=True):
         st.caption("Model effects")
         e1, e2, e3, e4, e5 = st.columns(5)
@@ -165,8 +165,9 @@ def page_one_way(wb):
         gbm_pred = p2.checkbox("GBM prediction", value=False)
         actuals = p3.checkbox("Actuals", value=False)
 
-    st.markdown("**Axis main options**")
-    oc1, oc2, oc3, _ = st.columns([1, 1, 1, 1])
+    ax_title, ax_opts = st.columns([1, 5], vertical_alignment="center")
+    ax_title.markdown("**Axis main options**")
+    oc1, oc2, oc3, _ = ax_opts.columns([1, 1, 1, 2])
     rebase = oc1.checkbox("Rebase", value=True)
     infinity_lower = oc2.checkbox("Infinity lower band", value=True)
     infinity_higher = oc3.checkbox("Infinity higher band", value=True)
@@ -238,8 +239,8 @@ def page_two_way(wb):
     var1 = st.selectbox("Variable 1", options, key="bv1")
     var2 = st.selectbox("Variable 2", options, index=min(1, len(options) - 1), key="bv2")
 
-    st.markdown("**Series to show**")
-    eff_col, pred_col = st.columns([1, 1])
+    title_col, eff_col, pred_col = st.columns([1, 2, 2], vertical_alignment="center")
+    title_col.markdown("**Series to show**")
     with eff_col, st.container(border=True):
         st.caption("Model effects")
         e1, e2 = st.columns(2)
@@ -251,8 +252,9 @@ def page_two_way(wb):
         gbm_pred = p1.checkbox("GBM prediction", value=False, key="bv_gbm")
         actuals = p2.checkbox("Actuals", value=False, key="bv_act")
 
-    st.markdown("**Axis main options**")
-    rebase = st.checkbox("Rebase", value=True, key="bv_rebase")
+    ax_title, ax_opts = st.columns([1, 5], vertical_alignment="center")
+    ax_title.markdown("**Axis main options**")
+    rebase = ax_opts.checkbox("Rebase", value=True, key="bv_rebase")
 
     with st.expander("More options (banding, labels)", expanded=False):
         st.markdown("**Banding per variable**")
