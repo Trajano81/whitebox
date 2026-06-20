@@ -1,5 +1,6 @@
 from .utils import *
 from .data_prep import DataPrep
+from .encoding import Encoder
 import xgboost as xgb
 
 
@@ -123,7 +124,8 @@ class Whitebox:
         self.feature_names = feature_names
         self.shap_df = shap_df
         self.glm_df = glm_df
-        self.category_mappings = category_mappings if category_mappings is not None else {}
+        # category_mappings is owned by the Encoder (created below) and aliased here.
+        self.category_mappings = {}
 
         self.fac_mapping = None
         self.config = {
@@ -171,11 +173,42 @@ class Whitebox:
         self.rename_glm = rename_glm
 
         if model is not None:
-            # Build model type specific variables
-            self._create_model_specific_variables()
+            # Resolve feature_names from the model without building the DMatrix yet.
+            self._resolve_feature_names()
         else:
             self.feature_names = list(self.data)
 
+        # Internal encoding (the only encoding path): the Encoder owns
+        # category_mappings and creates {col}_encoded columns BEFORE model-specific
+        # variables so the DMatrix / SHAP inputs can use them.
+        self.encoder = Encoder(
+            self.data, self.feature_names, category_mappings, verbose=self.verbose
+        )
+        self.category_mappings = self.encoder.category_mappings  # alias (same dict)
+        self.encoder.auto_encode()
+
+        if model is not None:
+            # Build model type specific variables (uses encoder-encoded columns).
+            self._create_model_specific_variables()
+
+        # Build link functions (depends on link_fn_str, which xgb/lgb may set above).
+        self._build_link_functions()
+
+        self.DataPrep = DataPrep(self)
+
+        # Use mapping fallbacks for fac_mapping
+        if mapping_dict is not None:
+            self.fac_mapping = mapping_dict                       # Priority 1: User-provided
+        elif self.category_mappings:
+            self.fac_mapping = self.encoder.category_mappings     # Priority 2: From encoding
+        self.default_engine = default_engine
+
+    def _build_link_functions(self):
+        """Set link_fn, _ci_fn and _scorepyon_link_fn from link_fn_str.
+
+        Factored out so it can be reused by __setstate__ (lambdas are not
+        picklable, so they are rebuilt on unpickle rather than stored).
+        """
         if self.link_fn_str in ["poisson", "gamma", "tweedie"]:
             self.link_fn = np.exp
             self._scorepyon_link_fn = "log"
@@ -202,20 +235,158 @@ class Whitebox:
             self._scorepyon_link_fn = None
             self._ci_fn = lambda mean, count=None: self.scale_parameter
         else:
+            self.link_fn = None
             self._scorepyon_link_fn = "ERROR"
             self._ci_fn = None
 
-        self.DataPrep = DataPrep(self)
+    def __getstate__(self):
+        # Drop non-picklable members; rebuilt on load:
+        # - link_fn / _ci_fn: lambdas
+        # - explainer: shap TreeExplainer (ctypes)
+        # - x_data: xgboost DMatrix (ctypes pointers)
+        state = self.__dict__.copy()
+        for key in ("link_fn", "_ci_fn", "explainer", "x_data"):
+            state.pop(key, None)
+        return state
 
-        # Process categorical columns (reconstruct mappings or encode)
-        self.DataPrep.process_categoricals()
+    def __setstate__(self, state):
+        self.__dict__.update(state)
+        self.explainer = None
+        self.x_data = None
+        self._build_link_functions()
+        # Rebuild the model-specific DMatrix/x_data (dropped because unpicklable).
+        if getattr(self, "model", None) is not None:
+            self._create_model_specific_variables()
 
-        # Use mapping fallbacks for fac_mapping
-        if mapping_dict != None:
-            self.fac_mapping = mapping_dict                       # Priority 1: User-provided
-        elif self.category_mappings:
-            self.fac_mapping = self.category_mappings             # Priority 2: From encoding
-        self.default_engine = default_engine
+    def _resolve_feature_names(self):
+        """Determine feature_names from the model if not provided, without building
+        the DMatrix (so encoding can run before model-specific variables)."""
+        if self.feature_names is not None:
+            return
+        mdl_type_str = str(type(self.model))
+        if "xgboost" in mdl_type_str:
+            if self.model.feature_names is None:
+                raise ValueError(
+                    "This xgboost model object does not contain feature names, please provide "
+                    "feature_names in the class construction in the same order they were created in the model"
+                )
+            self.feature_names = list(self.model.feature_names)
+        elif "lightgbm" in mdl_type_str:
+            self.feature_names = list(self.model.feature_name())
+        else:
+            raise TypeError(
+                "Not a valid booster. Only xgboost and lightgbm are accepted"
+            )
+
+    # ------------------------------------------------------------------
+    # Variable governance (profiling, proposals, status gate, ingestion)
+    # ------------------------------------------------------------------
+    def profile(self, name, missing_tokens=None):
+        """Profile a variable's levels and data-quality, storing the result on its
+        registry record (flags may move it to 'needs_cleaning')."""
+        from .governance import profile_variable
+
+        prof = profile_variable(self.data[name], name=name, missing_tokens=missing_tokens)
+        self.encoder.set_profile(name, prof)
+        return prof
+
+    def propose_cleaning(self, name, method="by_bins", n_bins=10, missing_tokens=None):
+        """Return an editable cleaning/banding proposal for a variable and store it
+        on the registry record. The reviewer edits then calls apply_cleaning."""
+        from .governance import propose_cleaning
+
+        proposal = propose_cleaning(
+            self.data[name],
+            name=name,
+            method=method,
+            n_bins=n_bins,
+            missing_tokens=missing_tokens,
+        )
+        if name in self.encoder.registry:
+            self.encoder.registry[name]["proposal"] = proposal
+        return proposal
+
+    def apply_cleaning(self, name, proposal):
+        """Materialize a (possibly edited) proposal: write the cleaned column,
+        re-encode it, clear cleaning flags, and reset status to pending_review.
+        Note: cleaning prepares a variable for the NEXT retrain; it does not update
+        the current model's SHAP."""
+        from .governance import apply_cleaning as _apply
+
+        cleaned = _apply(self.data, name, proposal)
+        self.data[name] = cleaned
+        self.encoder.encode_column(name)
+        rec = self.encoder.registry.get(name)
+        if rec is not None:
+            rec["data_quality"]["flags"] = []
+            rec["proposal"] = None
+            if rec["review_status"] == "needs_cleaning":
+                rec["review_status"] = "pending_review"
+        return self.data[name]
+
+    def set_status(self, name, status):
+        """Validated status transition (pending_review / ready_to_model /
+        needs_cleaning / excluded)."""
+        return self.encoder.set_status(name, status)
+
+    # ------------------------------------------------------------------
+    # Derived variables (group / combine) + plottable set
+    # ------------------------------------------------------------------
+    def plottable_variables(self):
+        """Original features plus derived variables (all selectable for plotting)."""
+        derived = [n for n in self.encoder.registry if self.encoder.is_derived(n)]
+        return list(self.feature_names) + derived
+
+    def add_group(self, name, source, level_map, default=None, created_by="user"):
+        """Create a grouped derived variable (see Encoder.add_group)."""
+        self.encoder.add_group(
+            name, source, level_map, default=default, created_by=created_by
+        )
+        return self
+
+    def add_combination(self, name, sources, sep="_x_", created_by="user"):
+        """Create a combined derived variable (see Encoder.add_combination)."""
+        self.encoder.add_combination(name, sources, sep=sep, created_by=created_by)
+        return self
+
+    def remove_variable(self, name):
+        """Delete a derived variable, freeing its primary-key name."""
+        return self.encoder.remove_derived(name)
+
+    def sync_variable(self, name, registry_path="registry.json", repo_dir="."):
+        """Propagate a variable's record to the shared registry. This is the
+        trigger hook for the two propagation events (variable created / new var
+        from raw data). It is OFFLINE-SAFE: it writes/validates the local
+        registry.json and only pushes when WHITEBOX_REGISTRY_SYNC=1 with a remote
+        configured (see whitebox.registry.sync)."""
+        from .registry import push_variable
+
+        if name not in self.encoder.registry:
+            raise ValueError(f"unknown variable {name!r}")
+        return push_variable(
+            name, self.encoder.registry[name], path=registry_path, repo_dir=repo_dir
+        )
+
+    def launch_report(self, port=8501, export_dir=None):
+        """Launch the interactive Streamlit report (one-way / two-way / data review
+        / variable manager). Requires the optional 'report' extra
+        (pip install 'whitebox[report]')."""
+        from .report import launch_report
+
+        return launch_report(self, port=port, export_dir=export_dir)
+
+    def trainable_variables(self):
+        """Variables approved for the retrain manifest (review_status ready_to_model)."""
+        return self.encoder.trainable_variables()
+
+    def ingest(self, new_data):
+        """Compare new data's schema to the current feature schema and return a
+        revision report: new / missing / changed variables."""
+        from .governance import diff_schema, schema_snapshot
+
+        old_snap = schema_snapshot(self.data, columns=self.feature_names)
+        new_snap = schema_snapshot(new_data, columns=list(new_data.columns))
+        return diff_schema(old_snap, new_snap)
     
     def univariate_plot(
         self,
@@ -251,6 +422,7 @@ class Whitebox:
         glmindic_cols=None,
         engine=None,
         joinshaps_error=True,
+        show=True,
         height=500,
         width=1000,
         **kwargs
@@ -391,6 +563,7 @@ class Whitebox:
         kwargs["joinshaps"] = joinshaps
         kwargs["glmindic_cols"] = glmindic_cols
         kwargs["joinshaps_error"] = joinshaps_error
+        kwargs["show"] = show
         kwargs["height"] = height
         kwargs["width"] = width
 
@@ -440,6 +613,7 @@ class Whitebox:
         glmindic_cols=None,
         joinshaps=None,
         save_plot=None,
+        show=True,
         width=1000,
         height=500,
         **kwargs
@@ -585,6 +759,7 @@ class Whitebox:
             glmindic_cols,
             joinshaps,
             save_plot,
+            show=show,
             **kwargs
         )
 
@@ -656,15 +831,11 @@ class Whitebox:
             else:
                 self.link_fn_str = xgb_map[model_objective]
 
-        # Build feature data for DMatrix, using _encoded columns where available
+        # Build feature data for DMatrix, using encoder-managed _encoded columns.
         import pandas as pd
         x_data_df = pd.DataFrame()
         for col in self.feature_names:
-            encoded_col = f'{col}_encoded'
-            if encoded_col in self.data.columns:
-                x_data_df[col] = self.data[encoded_col]  # Use encoded
-            else:
-                x_data_df[col] = self.data[col]  # Use original
+            x_data_df[col] = self.encoder.model_input_column(col)
 
         self.x_data = xgb.DMatrix(
             x_data_df,

@@ -1,0 +1,49 @@
+name: registry-propagate
+
+# Fans a registry.json change out to every active branch's REMOTE so a new
+# variable "flies back" to all modelers. Token-free: uses the Actions-provided
+# GITHUB_TOKEN (no stored/bot token). Triggered only by a change to registry.json
+# on the dedicated registry ref (the regex/path-based trigger). registry.json is
+# machine-owned (never hand-edited), so these branch updates are always
+# conflict-free.
+on:
+  push:
+    branches: [variables-registry]
+    paths:
+      - "registry.json"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: registry-propagate
+  cancel-in-progress: false
+
+jobs:
+  fan-out:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Fan out registry.json to active branches
+        run: |
+          set -euo pipefail
+          git config user.name "whitebox-bot"
+          git config user.email "whitebox-bot@users.noreply.github.com"
+          git show variables-registry:registry.json > /tmp/registry.json
+          # Active branches: most-recently-committed remotes, excluding the
+          # registry ref, HEAD, and gh-pages.
+          branches=$(git for-each-ref --sort=-committerdate \
+            --format='%(refname:short)' refs/remotes/origin \
+            | grep -vE 'origin/(variables-registry|HEAD|gh-pages)$' || true)
+          for remote_ref in $branches; do
+            branch=${remote_ref#origin/}
+            git checkout -B "$branch" "origin/$branch"
+            cp /tmp/registry.json registry.json
+            if ! git diff --quiet -- registry.json; then
+              git add registry.json
+              git commit -m "chore(variables): sync registry"
+              git push origin "$branch"
+            fi
+          done

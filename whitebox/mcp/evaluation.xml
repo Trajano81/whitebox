@@ -1,0 +1,45 @@
+<evaluation>
+  <!-- Read-only, verifiable questions over the demo dataset loaded via
+       whitebox_load_session (synthetic insurance data: features age, vehicle_value,
+       years_licensed, region, vehicle_type). -->
+  <qa_pair>
+    <question>After loading the demo session, how many feature variables does whitebox_list_variables report in total_count?</question>
+    <answer>5</answer>
+  </qa_pair>
+  <qa_pair>
+    <question>What is the review_status of every raw feature immediately after loading a session, before any review?</question>
+    <answer>pending_review</answer>
+  </qa_pair>
+  <qa_pair>
+    <question>For the 'region' variable in the demo, how many distinct categories does its category mapping contain (East, North, South, West)?</question>
+    <answer>4</answer>
+  </qa_pair>
+  <qa_pair>
+    <question>What origin value does whitebox_describe_variable report for the raw feature 'age'?</question>
+    <answer>raw</answer>
+  </qa_pair>
+  <qa_pair>
+    <question>When whitebox_propose_cleaning is called on a numeric variable without overriding n_bins, what is the default number of bins used?</question>
+    <answer>10</answer>
+  </qa_pair>
+  <qa_pair>
+    <question>What separator string joins source labels when whitebox_add_combination is called without overriding sep?</question>
+    <answer>_x_</answer>
+  </qa_pair>
+  <qa_pair>
+    <question>After creating a derived group with whitebox_add_group named 'region_grp', what review_status does it have?</question>
+    <answer>pending_review</answer>
+  </qa_pair>
+  <qa_pair>
+    <question>What does whitebox_sync_variables return for the trainable manifest before any variable is set to ready_to_model (empty)?</question>
+    <answer>[]</answer>
+  </qa_pair>
+  <qa_pair>
+    <question>If whitebox_set_variable_status tries to set a variable flagged needs_cleaning to ready_to_model, does it succeed or return an error?</question>
+    <answer>error</answer>
+  </qa_pair>
+  <qa_pair>
+    <question>What is the two-letter file extension format produced by whitebox_univariate_plot for its saved figure output?</question>
+    <answer>html</answer>
+  </qa_pair>
+</evaluation>

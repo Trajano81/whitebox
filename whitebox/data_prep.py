@@ -10,69 +10,11 @@ class DataPrep:
         self.whitebox = whitebox
 
     def process_categoricals(self, columns=None):
+        """Deprecated shim. Categorical encoding is now owned by ``Whitebox.encoder``
+        and runs automatically at construction (``Encoder.auto_encode``). Kept for
+        backward compatibility; delegates to the encoder.
         """
-        Process categorical columns: encode if needed, reconstruct mappings if possible.
-
-        Column naming convention:
-        - Original column keeps human-readable values (e.g., 'region')
-        - Encoded column has '_encoded' suffix (e.g., 'region_encoded')
-
-        Handles multiple scenarios:
-        - Object columns WITH mapping: create {col}_encoded using provided mapping
-        - Object columns WITHOUT mapping: warn (must provide mapping from training)
-        - Columns with _encoded suffix: reconstruct mapping from pair
-        - Numerical/int columns: skip
-
-        Parameters
-        ----------
-        columns : list, optional
-            Specific columns to process. If None, processes all feature_names.
-
-        Returns
-        -------
-        dict
-            Updated category_mappings {column: {code: label}}
-        """
-        if columns is None:
-            columns = self.whitebox.feature_names
-
-        processed_columns = []
-        for col in columns:
-            if col not in self.whitebox.data.columns:
-                continue
-
-            col_dtype = self.whitebox.data[col].dtype
-            encoded_col = f'{col}_encoded'
-            has_encoded = encoded_col in self.whitebox.data.columns
-            has_mapping = col in self.whitebox.category_mappings
-
-            # Scenario 3: Has _encoded column already - reconstruct mapping from pair
-            if has_encoded:
-                if not has_mapping:
-                    unique_pairs = self.whitebox.data[[col, encoded_col]].drop_duplicates()
-                    self.whitebox.category_mappings[col] = dict(
-                        zip(unique_pairs[encoded_col], unique_pairs[col])
-                    )
-                processed_columns.append(col)
-
-            # Scenario 2: Object column WITH mapping - create encoded
-            elif col_dtype == 'object' and has_mapping:
-                label_to_code = {v: k for k, v in self.whitebox.category_mappings[col].items()}
-                self.whitebox.data[encoded_col] = self.whitebox.data[col].map(label_to_code)
-                processed_columns.append(col)
-
-            # Scenario 1: Object column WITHOUT mapping - warn and skip
-            elif col_dtype == 'object' and not has_mapping:
-                if self.whitebox.verbose:
-                    print(f"Warning: '{col}' is object type but no category_mappings provided. "
-                          f"Cannot encode without mapping from training.")
-
-            # Scenario 4: Numerical/int columns - skip silently
-
-        if self.whitebox.verbose and processed_columns:
-            print(f"Processed {len(processed_columns)} categorical column(s): {processed_columns}")
-
-        return self.whitebox.category_mappings
+        return self.whitebox.encoder.auto_encode()
 
     def prep_shap_values(self, out_file=""):
         """
@@ -84,14 +26,10 @@ class DataPrep:
         self.whitebox.explainer = shap.TreeExplainer(self.whitebox.model)
 
         if os.path.exists(out_file) == False:
-            # Build feature data for SHAP, using _encoded columns where available
+            # Build feature data for SHAP, using encoder-managed _encoded columns.
             shap_data = pd.DataFrame()
             for col in self.whitebox.feature_names:
-                encoded_col = f'{col}_encoded'
-                if encoded_col in self.whitebox.data.columns:
-                    shap_data[col] = self.whitebox.data[encoded_col]  # Use encoded
-                else:
-                    shap_data[col] = self.whitebox.data[col]  # Use original
+                shap_data[col] = self.whitebox.encoder.model_input_column(col)
 
             shap_values = self.whitebox.explainer.shap_values(shap_data)
             shap_values = self.whitebox.link_fn(shap_values)
@@ -108,12 +46,24 @@ class DataPrep:
             print("Reading shapley from:" + out_file)
             self.whitebox.shap_df = pd.read_pickle(out_file)
     
+    def _derived_shap_series(self, name):
+        """Synthesize SHAP for a derived variable from its source feature(s):
+        a single source uses that feature's SHAP; multiple sources sum row-wise.
+        Grouping along the derived levels happens later via groupby on the x-axis.
+        """
+        if self.whitebox.shap_df is None:
+            self.prep_shap_values()
+        sources = self.whitebox.encoder.source_features(name)
+        if len(sources) == 1:
+            return self.whitebox.shap_df[sources[0]]
+        return self.whitebox.shap_df[sources].sum(axis=1)
+
     def prep_univariate_data(self, var_name, kwargs):
         """
         Creates univariate data to plot
         """
         if kwargs["shap"] is not None and (
-            var_name not in self.whitebox.feature_names
+            var_name not in self.whitebox.plottable_variables()
             and kwargs["joinshaps"] is None
             and kwargs["shap"]
         ):
@@ -236,7 +186,10 @@ class DataPrep:
                 self.prep_shap_values()
             # weighted shap
             if kwargs["joinshaps"] is None or len(kwargs["joinshaps"]) == 0:
-                shap_vals = self.whitebox.shap_df[var_name].values
+                if self.whitebox.encoder.is_derived(var_name):
+                    shap_vals = self._derived_shap_series(var_name).values
+                else:
+                    shap_vals = self.whitebox.shap_df[var_name].values
             else:
                 valid_shaps = self.get_valid_shaps(kwargs["joinshaps"])
                 shap_vals = self.whitebox.shap_df[valid_shaps].prod(axis=1).values
@@ -565,19 +518,20 @@ class DataPrep:
         glmindic_cols=None,
         joinshaps=None,
     ):
-        if var1 not in self.whitebox.feature_names:
+        plottable = self.whitebox.plottable_variables()
+        if var1 not in plottable:
             raise ValueError(
                 "The variable "
                 + var1
-                + " is not in the model the availables variables are "
-                + str(self.whitebox.feature_names)
+                + " is not available to plot, the available variables are "
+                + str(plottable)
             )
-        if var2 not in self.whitebox.feature_names:
+        if var2 not in plottable:
             raise ValueError(
                 "The variable "
                 + var2
-                + " is not in the model the availables variables are "
-                + str(self.whitebox.feature_names)
+                + " is not available to plot, the available variables are "
+                + str(plottable)
             )
 
         data_to_plot = pd.DataFrame()
@@ -619,12 +573,14 @@ class DataPrep:
                     * data_to_plot["weight"]
                 ).reset_index(drop=True)
             else:
-                data_to_plot["shap"] = self.whitebox.shap_df[var1].reset_index(
-                    drop=True
-                )
+                if self.whitebox.encoder.is_derived(var1):
+                    var1_shap = self._derived_shap_series(var1)
+                else:
+                    var1_shap = self.whitebox.shap_df[var1]
+                data_to_plot["shap"] = var1_shap.reset_index(drop=True)
                 data_to_plot["shap_wgt"] = (
-                    self.whitebox.shap_df[var1] * data_to_plot["weight"]
-                ).reset_index(drop=True)
+                    var1_shap.values * data_to_plot["weight"].values
+                )
         
         if glm:
             if glmindic_cols is not None:
@@ -633,8 +589,19 @@ class DataPrep:
                     * data_to_plot["weight"]
                 ).reset_index(drop=True)
             else:
+                # Resolve the GLM column for var1, honoring glm_var_map when the GLM
+                # export uses a different column name (e.g. "age" -> "age_band").
+                glm_col = var1
+                if self.whitebox.glm_var_map and var1 in self.whitebox.glm_var_map:
+                    glm_col = self.whitebox.glm_var_map[var1]
+                if glm_col not in self.whitebox.glm_df.columns:
+                    raise ValueError(
+                        f"GLM column for '{var1}' not found in glm_df (looked for "
+                        f"'{glm_col}'). Use glm_var_map to map GBM variable names to GLM "
+                        f"column names. Available: {list(self.whitebox.glm_df.columns)}"
+                    )
                 data_to_plot["glm_wgt"] = (
-                    self.whitebox.glm_df[var1] * data_to_plot["weight"]
+                    self.whitebox.glm_df[glm_col] * data_to_plot["weight"]
                 ).reset_index(drop=True)
 
         if actuals:

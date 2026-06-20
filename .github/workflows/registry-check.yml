@@ -1,0 +1,20 @@
+name: registry-check
+
+# Validates the shared registry.json (global primary key + governance invariants).
+# No-ops on branches that do not carry registry.json (it lives on the
+# variables-registry ref), so it is safe to enable repo-wide.
+on:
+  push:
+    branches: [variables-registry]
+  pull_request:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Validate registry.json
+        run: python whitebox/registry/validate.py registry.json

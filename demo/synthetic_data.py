@@ -5,6 +5,8 @@ This module generates synthetic insurance-like data for demonstrating
 Whitebox's visualization capabilities.
 """
 
+import warnings
+
 import numpy as np
 import pandas as pd
 import xgboost as xgb
@@ -186,6 +188,12 @@ def encode_categoricals(data, columns=None, optimize=False, verbose=True):
     dict
         Mapping of {column: {code: label}}
     """
+    warnings.warn(
+        "encode_categoricals is deprecated: Whitebox now encodes categoricals "
+        "internally via its Encoder. Pass raw data directly to Whitebox.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
     data_encoded = data.copy()
     category_mappings = {}
     encoded_columns = []
@@ -276,6 +284,12 @@ def prepare_data_for_whitebox(data, feature_names, optimize=False, verbose=True)
     dict
         Mapping of categorical values to codes
     """
+    warnings.warn(
+        "prepare_data_for_whitebox is deprecated: Whitebox now encodes categoricals "
+        "internally. Pass raw data directly to Whitebox(data=...).",
+        DeprecationWarning,
+        stacklevel=2,
+    )
     # Validate feature columns exist
     missing_features = [col for col in feature_names if col not in data.columns]
     if missing_features:
@@ -289,7 +303,10 @@ def prepare_data_for_whitebox(data, feature_names, optimize=False, verbose=True)
 
 def get_demo_data_and_model(n_samples=10000, random_state=42):
     """
-    Convenience function to get synthetic data and trained model.
+    Convenience function to get synthetic data and a trained model.
+
+    Whitebox now encodes categoricals internally, so this returns the RAW data
+    (with human-readable categorical columns) and no external category_mappings.
 
     Parameters
     ----------
@@ -301,27 +318,22 @@ def get_demo_data_and_model(n_samples=10000, random_state=42):
     Returns
     -------
     tuple
-        (data, model, feature_names, category_mappings)
+        (data, model, feature_names)
     """
-    # Generate data
     data = generate_synthetic_data(n_samples=n_samples, random_state=random_state)
 
-    # Define features
     feature_names = ['age', 'vehicle_value', 'years_licensed', 'region', 'vehicle_type']
 
-    # Prepare for model training
-    data_encoded, category_mappings = prepare_data_for_whitebox(data, feature_names)
-
-    # Train model
+    # train_xgboost_model encodes raw object columns internally for training.
     model = train_xgboost_model(
-        data_encoded,
+        data,
         feature_names,
         weight_col='exposure',
         target_col='claim_count',
-        random_state=random_state
+        random_state=random_state,
     )
 
-    return data_encoded, model, feature_names, category_mappings
+    return data, model, feature_names
 
 
 if __name__ == '__main__':
