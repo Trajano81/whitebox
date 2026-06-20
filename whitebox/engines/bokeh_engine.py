@@ -110,20 +110,23 @@ class BokehEngine(PlotEngine):
 
         # add renderers
         ######################################
-        # plot weight
-        source = ColumnDataSource(data=dict(var=x_indices, counts=w_avg))
-        r_w = p.vbar(
-            x="var",
-            top="counts",
-            width=0.9,
-            source=source,
-            line_color="white",
-            color=self.whitebox.config["colors"]["weight"],
-            alpha=0.5,
-            y_range_name="Weight",
-            name=self.whitebox.config["labels"]["weight"],
-        )
-        L_items = [(self.whitebox.config["labels"]["weight"], [r_w])]
+        # plot weight (the exposure/weight per band, as background bars on the
+        # secondary y-axis). Only drawn when the weight flag is on.
+        L_items = []
+        if kwargs.get("weight", True):
+            source = ColumnDataSource(data=dict(var=x_indices, counts=w_avg))
+            r_w = p.vbar(
+                x="var",
+                top="counts",
+                width=0.9,
+                source=source,
+                line_color="white",
+                color=self.whitebox.config["colors"]["weight"],
+                alpha=0.5,
+                y_range_name="Weight",
+                name=self.whitebox.config["labels"]["weight"],
+            )
+            L_items = [(self.whitebox.config["labels"]["weight"], [r_w])]
 
         # shap points
         if "shap_points" in kwargs.keys():
@@ -730,20 +733,23 @@ class BokehEngine(PlotEngine):
 
         # add renderers
         ######################################
-        # plot weight
-        source = ColumnDataSource(data=dict(var=x_indices, counts=w_avg))
-        r_w = p.vbar(
-            x="var",
-            top="counts",
-            width=0.9,
-            source=source,
-            line_color="white",
-            color=self.whitebox.config["colors"]["weight"],
-            alpha=0.5,
-            y_range_name="Weight",
-            name=self.whitebox.config["labels"]["weight"],
-        )
-        L_items = [(self.whitebox.config["labels"]["weight"], [r_w])]
+        # plot weight (the exposure/weight per band, as background bars on the
+        # secondary y-axis). Only drawn when the weight flag is on.
+        L_items = []
+        if kwargs.get("weight", True):
+            source = ColumnDataSource(data=dict(var=x_indices, counts=w_avg))
+            r_w = p.vbar(
+                x="var",
+                top="counts",
+                width=0.9,
+                source=source,
+                line_color="white",
+                color=self.whitebox.config["colors"]["weight"],
+                alpha=0.5,
+                y_range_name="Weight",
+                name=self.whitebox.config["labels"]["weight"],
+            )
+            L_items = [(self.whitebox.config["labels"]["weight"], [r_w])]
 
         # Colormap
         lbs = []

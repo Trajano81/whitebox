@@ -7,10 +7,13 @@ Pages: One-way, Two-way, Data review / governance, Variable manager.
 Bokeh figures are embedded as standalone HTML via bokeh.embed.file_html, which
 avoids the Bokeh 3.x incompatibility with st.bokeh_chart.
 """
+import hashlib
+import json
 import os
 import pickle
 import sys
 
+import pandas as pd
 import streamlit as st
 import streamlit.components.v1 as components
 from bokeh.embed import file_html
@@ -25,6 +28,59 @@ EXPORT_DIR = _ARGV[1] if len(_ARGV) > 1 else "whitebox_report_exports"
 def load_wb(path):
     with open(path, "rb") as f:
         return pickle.load(f)
+
+
+def _profile_cache_path():
+    """JSON file that persists computed profiles next to the loaded pickle."""
+    base = PKL_PATH or os.path.join(EXPORT_DIR, "whitebox")
+    return base + ".profile_cache.json"
+
+
+def _load_profile_cache():
+    path = _profile_cache_path()
+    if os.path.exists(path):
+        try:
+            with open(path) as f:
+                return json.load(f)
+        except (json.JSONDecodeError, OSError):
+            return {}
+    return {}
+
+
+def _save_profile_cache(cache):
+    try:
+        with open(_profile_cache_path(), "w") as f:
+            json.dump(cache, f, indent=2)
+    except OSError:
+        pass
+
+
+def _column_signature(series):
+    """Stable hash of a column's contents. The cache invalidates automatically
+    when the underlying data changes (for example after apply_cleaning rewrites
+    the column), so a stale profile is never served."""
+    hashed = pd.util.hash_pandas_object(series, index=False).to_numpy()
+    return hashlib.sha1(hashed.tobytes()).hexdigest()
+
+
+def cached_profile(wb, var):
+    """Profile `var`, backed by a JSON file cache so it is not recomputed every time.
+
+    On a cache hit (same column contents) the stored profile is returned without
+    rerunning the profiler; set_profile is still called so the registry flags and
+    review status stay in sync, exactly as the uncached path would leave them.
+    """
+    sig = _column_signature(wb.data[var])
+    cache = _load_profile_cache()
+    entry = cache.get(var)
+    if entry and entry.get("sig") == sig:
+        prof = entry["profile"]
+        wb.encoder.set_profile(var, prof)
+        return prof
+    prof = wb.profile(var)
+    cache[var] = {"sig": sig, "profile": prof}
+    _save_profile_cache(cache)
+    return prof
 
 
 def figure_html(fig, key):
@@ -97,9 +153,9 @@ def page_one_way(wb):
         st.caption("Model effects")
         e1, e2, e3 = st.columns(3)
         shap = e1.checkbox("SHAP", value=True)
-        shap_points = e2.checkbox("SHAP points", value=False)
-        # SHAP +/- SD only makes sense with the average SHAP line.
-        shap_sd = e3.checkbox("SHAP +/- SD", value=False, disabled=not shap)
+        # SHAP +/- SD only makes sense with the average SHAP line, so it sits beside it.
+        shap_sd = e2.checkbox("SHAP +/- SD", value=False, disabled=not shap)
+        shap_points = e3.checkbox("SHAP points", value=False)
         e4, e5, _e6 = st.columns(3)
         glm = e4.checkbox("GLM indication", value=False)
         weight = e5.checkbox("Weight", value=True)
@@ -270,14 +326,16 @@ def page_data_review(wb):
         key="profile_btn",
         help="Scan the selected variable for data-quality issues (missingness, cardinality, odd tokens).",
     ):
-        st.session_state["dr_profile"] = {"var": var, "data": wb.profile(var)}
+        st.session_state["dr_profile"] = {"var": var, "data": cached_profile(wb, var)}
 
     # Render the profile output unconditionally from session_state (the key fix: NOT
     # inside an if-button block, so changing other widgets does not wipe this).
+    # The JSON sits in its own expander so the user can collapse (hide) it.
     _stored_profile = st.session_state.get("dr_profile")
     if _stored_profile and _stored_profile["var"] == var:
         prof = _stored_profile["data"]
-        st.json(prof)
+        with st.expander(f"Profile result: {var}", expanded=True):
+            st.json(prof)
         with st.expander("What do these profile fields mean?"):
             st.markdown(
                 "- **name**: the variable being profiled.\n"
