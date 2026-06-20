@@ -71,6 +71,7 @@ def page_one_way(wb):
     weight = c4.checkbox("Weight", value=True)
 
     with st.expander("Plot options", expanded=False):
+        st.markdown("**Axis main options**")
         oc1, oc2, oc3 = st.columns(3)
         rebase = oc1.checkbox("Rebase", value=True)
         infinity_lower = oc2.checkbox("Infinity lower band", value=True)
@@ -83,12 +84,16 @@ def page_one_way(wb):
         start = rc1.text_input("Start (override)", value="")
         finish = rc2.text_input("Finish (override)", value="")
         stepsize = rc3.text_input("Stepsize (override)", value="")
-        sc1, sc2 = st.columns(2)
-        n_shap_points = sc1.number_input("SHAP points sample (n)", 100, 200000, 1000, step=100)
-        ci_z = sc2.number_input("SD band width (ci_z)", 0.0, 5.0, 2.0, step=0.5)
         yc1, yc2 = st.columns(2)
         y_min = yc1.text_input("Y axis min", value="")
         y_max = yc2.text_input("Y axis max", value="")
+
+        st.markdown("**SHAP options**")
+        sc1, sc2 = st.columns(2)
+        n_shap_points = sc1.number_input("SHAP points sample (n)", 100, 200000, 1000, step=100)
+        ci_z = sc2.number_input("SD band width (ci_z)", 0.0, 5.0, 2.0, step=0.5)
+
+        st.markdown("**Labels**")
         plot_name = st.text_input("Plot title", value="Univariate Plot")
 
     if st.button("Render", key="render_one"):
@@ -138,6 +143,7 @@ def page_two_way(wb):
     actuals = c4.checkbox("Actuals", value=False, key="bv_act")
 
     with st.expander("Plot options", expanded=False):
+        st.markdown("**Axis main options**")
         rebase = st.checkbox("Rebase", value=True, key="bv_rebase")
         st.caption("Bands per variable (numeric; 0 = auto)")
         v1c1, v1c2, v1c3 = st.columns(3)
@@ -148,6 +154,8 @@ def page_two_way(wb):
         nlevels_var2 = v2c1.number_input("var2 nlevels", 0, 100, 0, key="bv_nl2")
         ps2 = v2c2.number_input("var2 percentile start", 0, 100, 1, key="bv_ps2")
         pf2 = v2c3.number_input("var2 percentile finish", 0, 100, 99, key="bv_pf2")
+
+        st.markdown("**Labels**")
         plot_title = st.text_input("Plot title", value="Bivariate plot", key="bv_title")
 
     if st.button("Render", key="render_two"):
