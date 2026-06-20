@@ -203,8 +203,14 @@ print("wrote wb.pkl")
 Then launch the app, passing the two positional arguments after `--`:
 
 ```bash
-python -m streamlit run whitebox/report/app.py --server.port 8501 -- wb.pkl whitebox_report_exports
+python -m streamlit run whitebox/report/app.py --server.port 8501 --server.headless true -- wb.pkl whitebox_report_exports
 ```
+
+`--server.headless true` matters: on its first run Streamlit otherwise shows an
+interactive "Welcome to Streamlit ... Email:" prompt and waits on stdin. In a
+terminal you can just press Enter, but a process with no terminal (a notebook
+subprocess) cannot answer it and exits before binding the port. `wb.launch_report()`
+always passes this flag for you.
 
 The app reads `sys.argv` directly (`whitebox/report/app.py`):
 
@@ -254,7 +260,7 @@ machines on your network, bind to all interfaces:
 
 ```bash
 python -m streamlit run whitebox/report/app.py \
-  --server.address 0.0.0.0 --server.port 8501 \
+  --server.address 0.0.0.0 --server.port 8501 --server.headless true \
   -- wb.pkl whitebox_report_exports
 ```
 
@@ -277,7 +283,7 @@ A minimal container entrypoint would:
 1. Build a `Whitebox`, precompute SHAP, set `explainer = None`, and pickle it to
    a known path (see the `make_pickle.py` step above).
 2. Run
-   `python -m streamlit run whitebox/report/app.py --server.address 0.0.0.0 --server.port 8501 -- /path/to/wb.pkl /path/to/exports`.
+   `python -m streamlit run whitebox/report/app.py --server.address 0.0.0.0 --server.port 8501 --server.headless true -- /path/to/wb.pkl /path/to/exports`.
 
 Keep in mind the report is designed for local, interactive use launched from a
 session. Treat a hosted deployment as a read-only viewer of a pre-built pickle,
@@ -290,6 +296,15 @@ and remember the no-auth caveat above.
 - **`ImportError: the report requires Streamlit ...`**: the optional extra is
   not installed. Run `pip install -e '.[report]'` (or
   `pip install 'whitebox[report]'`).
+- **Browser shows `ERR_CONNECTION_REFUSED` at `http://localhost:8501/`**: nothing
+  is listening there, so the Streamlit subprocess exited before binding. The usual
+  cause is the first-run interactive email prompt blocking on stdin (see the
+  `--server.headless true` note above). `wb.launch_report()` now runs headless,
+  waits until the server is actually serving, opens the browser itself, and writes
+  the server output to `<export_dir>/streamlit_report.log`. If startup still fails
+  it raises a `RuntimeError` with the log tail. Check `info["log_path"]` (the launch
+  returns `{process, url, log_path, ...}`) and confirm `streamlit` is installed in
+  the same Python that runs your notebook kernel (`import streamlit` in a cell).
 - **Port already in use**: pass a different port,
   `wb.launch_report(port=8600)`, or `--server.port 8600` when running the app
   directly. You can also free the default port with

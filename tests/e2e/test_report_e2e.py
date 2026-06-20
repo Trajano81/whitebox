@@ -28,7 +28,7 @@ def test_report_serves(wb_clean):
     from whitebox.report.launcher import launch_report
 
     port = _free_port()
-    info = launch_report(wb_clean, port=port)
+    info = launch_report(wb_clean, port=port, open_browser=False)
     proc = info["process"]
     try:
         ok = False

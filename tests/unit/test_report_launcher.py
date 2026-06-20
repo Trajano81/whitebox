@@ -20,6 +20,9 @@ def test_launch_report_wires_without_spawn(wb):
     info = launch_report(wb, _spawn=False)
     assert info["pkl_path"].endswith(".whitebox.pkl")
     assert "streamlit" in info["cmd"]
+    # Must run headless so the first-run email prompt does not block the subprocess.
+    assert "--server.headless" in info["cmd"]
+    assert info["cmd"][info["cmd"].index("--server.headless") + 1] == "true"
     # SHAP precomputed and explainer dropped for a clean pickle.
     assert wb.shap_df is not None
     assert wb.explainer is None

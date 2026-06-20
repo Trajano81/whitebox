@@ -367,13 +367,16 @@ class Whitebox:
             name, self.encoder.registry[name], path=registry_path, repo_dir=repo_dir
         )
 
-    def launch_report(self, port=8501, export_dir=None):
+    def launch_report(self, port=8501, export_dir=None, open_browser=True):
         """Launch the interactive Streamlit report (one-way / two-way / data review
         / variable manager). Requires the optional 'report' extra
-        (pip install 'whitebox[report]')."""
+        (pip install 'whitebox[report]'). Runs headless and opens a browser tab at
+        the served URL; set open_browser=False to skip opening a browser."""
         from .report import launch_report
 
-        return launch_report(self, port=port, export_dir=export_dir)
+        return launch_report(
+            self, port=port, export_dir=export_dir, open_browser=open_browser
+        )
 
     def trainable_variables(self):
         """Variables approved for the retrain manifest (review_status ready_to_model)."""
