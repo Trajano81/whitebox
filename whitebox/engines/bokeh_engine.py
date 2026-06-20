@@ -412,6 +412,12 @@ class BokehEngine(PlotEngine):
                     shapbase = data_to_plot_agg.xs(level, level="var2")[
                         "shap_avg"
                     ].iloc[base]
+                    if shapbase == 0 or np.isnan(shapbase):
+                        print(
+                            "Warning: unable to rebase shap for "
+                            + var2 + "=" + str(level) + "."
+                        )
+                        shapbase = 1
                 else:
                     shapbase = 1
 
@@ -426,8 +432,9 @@ class BokehEngine(PlotEngine):
                     / shapbase
                 )
 
-                lower = min(lower, np.nanmin(y))
-                upper = max(upper, np.nanmax(y))
+                if not np.all(np.isnan(y)):
+                    lower = min(lower, np.nanmin(y))
+                    upper = max(upper, np.nanmax(y))
 
                 source = ColumnDataSource(data=dict(var=x, y=y))
                 r1 = p.line(
@@ -455,6 +462,12 @@ class BokehEngine(PlotEngine):
                     glmbase = data_to_plot_agg.xs(level, level="var2")["glm_avg"].iloc[
                         base
                     ]
+                    if glmbase == 0 or np.isnan(glmbase):
+                        print(
+                            "Warning: unable to rebase glm for "
+                            + var2 + "=" + str(level) + "."
+                        )
+                        glmbase = 1
                 else:
                     glmbase = 1
 
@@ -469,8 +482,9 @@ class BokehEngine(PlotEngine):
                     / glmbase
                 )
 
-                lower = min(lower, np.nanmin(y))
-                upper = max(upper, np.nanmax(y))
+                if not np.all(np.isnan(y)):
+                    lower = min(lower, np.nanmin(y))
+                    upper = max(upper, np.nanmax(y))
 
                 source = ColumnDataSource(data=dict(var=x, y=y))
                 r1 = p.line(
@@ -519,6 +533,12 @@ class BokehEngine(PlotEngine):
                     actbase = data_to_plot_agg.xs(level, level="var2")["actuals"].iloc[
                         base
                     ]
+                    if actbase == 0 or np.isnan(actbase):
+                        print(
+                            "Warning: unable to rebase actuals for "
+                            + var2 + "=" + str(level) + "."
+                        )
+                        actbase = 1
                 else:
                     actbase = 1
                 xdata_cat = (
@@ -532,8 +552,9 @@ class BokehEngine(PlotEngine):
                     / actbase
                 )
 
-                lower = min(lower, np.nanmin(ydata))
-                upper = max(upper, np.nanmax(ydata))
+                if not np.all(np.isnan(ydata)):
+                    lower = min(lower, np.nanmin(ydata))
+                    upper = max(upper, np.nanmax(ydata))
 
                 source = ColumnDataSource(data=dict(var=xdata, y=ydata))
                 r1act = p.line(
@@ -556,6 +577,7 @@ class BokehEngine(PlotEngine):
                 legend_item_list.append(
                     (
                         self.whitebox.config["labels"]["actuals"]
+                        + ": "
                         + var2
                         + "="
                         + str(level),
@@ -568,6 +590,12 @@ class BokehEngine(PlotEngine):
                     gbmpredbase = data_to_plot_agg.xs(level, level="var2")[
                         "gbm_pred"
                     ].iloc[base]
+                    if gbmpredbase == 0 or np.isnan(gbmpredbase):
+                        print(
+                            "Warning: unable to rebase gbm_pred for "
+                            + var2 + "=" + str(level) + "."
+                        )
+                        gbmpredbase = 1
                 else:
                     gbmpredbase = 1
 
@@ -582,8 +610,9 @@ class BokehEngine(PlotEngine):
                     / gbmpredbase
                 )
 
-                lower = min(lower, np.nanmin(ydata))
-                upper = max(upper, np.nanmax(ydata))
+                if not np.all(np.isnan(ydata)):
+                    lower = min(lower, np.nanmin(ydata))
+                    upper = max(upper, np.nanmax(ydata))
 
                 source = ColumnDataSource(data=dict(var=xdata, y=ydata))
                 r1gbm = p.line(
@@ -606,6 +635,7 @@ class BokehEngine(PlotEngine):
                 legend_item_list.append(
                     (
                         self.whitebox.config["labels"]["gbm_pred"]
+                        + ": "
                         + var2
                         + "="
                         + str(level),
