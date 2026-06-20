@@ -27,19 +27,24 @@ def load_wb(path):
         return pickle.load(f)
 
 
-def render(fig, key, height=640):
-    """Embed a Bokeh figure as standalone HTML and return the HTML string.
-
-    The figure stretches to the available width so the right-side legend is not
-    clipped, and the iframe is given generous height.
-    """
+def figure_html(fig, key):
+    """Bokeh figure -> standalone HTML string. The figure stretches to the iframe
+    width so the right-side legend is not clipped."""
     try:
         fig.sizing_mode = "stretch_width"
     except Exception:
         pass
-    html = file_html(fig, CDN, key)
+    return file_html(fig, CDN, key)
+
+
+def show_html(html, height=640):
+    """Embed an HTML string into the page."""
     components.html(html, height=height, scrolling=True)
-    return html
+
+
+def _optional_float(text):
+    text = (text or "").strip()
+    return float(text) if text else None
 
 
 def save_summary(html, filename):
@@ -53,18 +58,70 @@ def save_summary(html, filename):
 def page_one_way(wb):
     st.header("One-way (univariate)")
     var = st.selectbox("Variable", wb.plottable_variables())
+
+    st.markdown("**Series to show**")
     c1, c2, c3, c4 = st.columns(4)
     shap = c1.checkbox("SHAP", value=True)
-    glm = c2.checkbox("GLM", value=False)
-    actuals = c3.checkbox("Actuals", value=False)
+    shap_points = c1.checkbox("SHAP points", value=False)
+    shap_sd = c2.checkbox("SHAP +/- SD", value=False)
+    glm = c2.checkbox("GLM indication", value=False)
+    glm_pred = c3.checkbox("GLM prediction", value=False)
+    gbm_pred = c3.checkbox("GBM prediction", value=False)
+    actuals = c4.checkbox("Actuals", value=False)
     weight = c4.checkbox("Weight", value=True)
+
+    with st.expander("Plot options", expanded=False):
+        oc1, oc2, oc3 = st.columns(3)
+        rebase = oc1.checkbox("Rebase", value=True)
+        infinity_lower = oc2.checkbox("Infinity lower band", value=True)
+        infinity_higher = oc3.checkbox("Infinity higher band", value=True)
+        bc1, bc2, bc3 = st.columns(3)
+        nlevels = bc1.number_input("Bands (numeric, nlevels; 0 = auto)", 0, 100, 0)
+        pstart = bc2.number_input("Percentile start", 0, 100, 10)
+        pfinish = bc3.number_input("Percentile finish", 0, 100, 90)
+        rc1, rc2, rc3 = st.columns(3)
+        start = rc1.text_input("Start (override)", value="")
+        finish = rc2.text_input("Finish (override)", value="")
+        stepsize = rc3.text_input("Stepsize (override)", value="")
+        sc1, sc2 = st.columns(2)
+        n_shap_points = sc1.number_input("SHAP points sample (n)", 100, 200000, 1000, step=100)
+        ci_z = sc2.number_input("SD band width (ci_z)", 0.0, 5.0, 2.0, step=0.5)
+        yc1, yc2 = st.columns(2)
+        y_min = yc1.text_input("Y axis min", value="")
+        y_max = yc2.text_input("Y axis max", value="")
+        plot_name = st.text_input("Plot title", value="Univariate Plot")
+
     if st.button("Render", key="render_one"):
-        fig = wb.univariate_plot(
-            var, shap=shap, glm=glm, actuals=actuals, weight=weight, show=False
+        kwargs = dict(
+            shap=shap, shap_points=shap_points, glm=glm, glm_pred=glm_pred,
+            gbm_pred=gbm_pred, actuals=actuals, weight=weight, rebase=rebase,
+            infinity_lower=infinity_lower, infinity_higher=infinity_higher,
+            percentile_start=int(pstart), percentile_finish=int(pfinish),
+            n_shap_points=int(n_shap_points), ci_z=float(ci_z),
+            plot_name=plot_name, show=False,
         )
-        html = render(fig, var)
+        if shap_sd:
+            kwargs["shap_sd"] = True
+        if int(nlevels) > 0:
+            kwargs["nlevels"] = int(nlevels)
+        for name, val in (("start", start), ("finish", finish), ("stepsize", stepsize),
+                          ("y_axis_min", y_min), ("y_axis_max", y_max)):
+            f = _optional_float(val)
+            if f is not None:
+                kwargs[name] = f
+        try:
+            fig = wb.univariate_plot(var, **kwargs)
+            st.session_state["one_html"] = figure_html(fig, var)
+            st.session_state["one_name"] = f"univariate_{var}.html"
+        except Exception as e:  # noqa: BLE001
+            st.error(f"Render failed: {e}")
+
+    if st.session_state.get("one_html"):
+        show_html(st.session_state["one_html"])
         if st.button("Save summary", key="save_one"):
-            st.success(f"Saved {save_summary(html, f'univariate_{var}.html')}")
+            st.success(
+                f"Saved {save_summary(st.session_state['one_html'], st.session_state['one_name'])}"
+            )
 
 
 def page_two_way(wb):
@@ -72,12 +129,50 @@ def page_two_way(wb):
     options = wb.plottable_variables()
     var1 = st.selectbox("Variable 1", options, key="bv1")
     var2 = st.selectbox("Variable 2", options, index=min(1, len(options) - 1), key="bv2")
+
+    st.markdown("**Series to show**")
+    c1, c2, c3, c4 = st.columns(4)
+    shap = c1.checkbox("SHAP", value=True, key="bv_shap")
+    glm = c2.checkbox("GLM indication", value=False, key="bv_glm")
+    gbm_pred = c3.checkbox("GBM prediction", value=False, key="bv_gbm")
+    actuals = c4.checkbox("Actuals", value=False, key="bv_act")
+
+    with st.expander("Plot options", expanded=False):
+        rebase = st.checkbox("Rebase", value=True, key="bv_rebase")
+        st.caption("Bands per variable (numeric; 0 = auto)")
+        v1c1, v1c2, v1c3 = st.columns(3)
+        nlevels_var1 = v1c1.number_input("var1 nlevels", 0, 100, 0, key="bv_nl1")
+        ps1 = v1c2.number_input("var1 percentile start", 0, 100, 1, key="bv_ps1")
+        pf1 = v1c3.number_input("var1 percentile finish", 0, 100, 99, key="bv_pf1")
+        v2c1, v2c2, v2c3 = st.columns(3)
+        nlevels_var2 = v2c1.number_input("var2 nlevels", 0, 100, 0, key="bv_nl2")
+        ps2 = v2c2.number_input("var2 percentile start", 0, 100, 1, key="bv_ps2")
+        pf2 = v2c3.number_input("var2 percentile finish", 0, 100, 99, key="bv_pf2")
+        plot_title = st.text_input("Plot title", value="Bivariate plot", key="bv_title")
+
     if st.button("Render", key="render_two"):
-        fig = wb.bivariate_plot(var1, var2, shap=True, show=False)
-        html = render(fig, f"{var1}_x_{var2}")
+        kwargs = dict(
+            shap=shap, glm=glm, gbm_pred=gbm_pred, actuals=actuals, rebase=rebase,
+            percentile_start_var1=int(ps1), percentile_finish_var1=int(pf1),
+            percentile_start_var2=int(ps2), percentile_finish_var2=int(pf2),
+            plot_title=plot_title, show=False,
+        )
+        if int(nlevels_var1) > 0:
+            kwargs["nlevels_var1"] = int(nlevels_var1)
+        if int(nlevels_var2) > 0:
+            kwargs["nlevels_var2"] = int(nlevels_var2)
+        try:
+            fig = wb.bivariate_plot(var1, var2, **kwargs)
+            st.session_state["two_html"] = figure_html(fig, f"{var1}_x_{var2}")
+            st.session_state["two_name"] = f"bivariate_{var1}_x_{var2}.html"
+        except Exception as e:  # noqa: BLE001
+            st.error(f"Render failed: {e}")
+
+    if st.session_state.get("two_html"):
+        show_html(st.session_state["two_html"])
         if st.button("Save summary", key="save_two"):
             st.success(
-                f"Saved {save_summary(html, f'bivariate_{var1}_x_{var2}.html')}"
+                f"Saved {save_summary(st.session_state['two_html'], st.session_state['two_name'])}"
             )
 
 
@@ -98,9 +193,37 @@ def page_data_review(wb):
     st.dataframe(rows, use_container_width=True)
 
     var = st.selectbox("Review variable", wb.plottable_variables(), key="review_var")
-    if st.button("Profile + propose", key="profile_btn"):
+    if st.button(
+        "Profile + propose",
+        key="profile_btn",
+        help=(
+            "Scan the selected variable for data-quality issues (the Profile) and "
+            "suggest an editable cleaning plan (the Proposal). Numeric variables are "
+            "banded into bins; categorical variables get a level map that folds "
+            "missing tokens to 'Missing' and rare levels to 'Other'. Review the "
+            "proposal, then use 'Apply cleaning' to materialize it."
+        ),
+    ):
         prof = wb.profile(var)
         st.json(prof)
+        with st.expander("What do these profile fields mean?"):
+            st.markdown(
+                "- **name**: the variable being profiled.\n"
+                "- **dtype**: `numeric` or `categorical` (decides which cleaning is offered).\n"
+                "- **n**: total number of rows.\n"
+                "- **n_missing**: values counted as missing, real NaN/None plus tokens like "
+                "`\"\"`, `NA`, `.`, `null`, `NaN` (case and whitespace insensitive).\n"
+                "- **missing_pct**: `n_missing` as a percentage of `n`.\n"
+                "- **n_unique**: distinct non-missing values.\n"
+                "- **top_levels**: the 20 most frequent categories with count and pct "
+                "(empty for numeric variables).\n"
+                "- **odd_tokens**: distinct category values with odd characters (anything "
+                "outside letters, digits, space, `_`, `-`) or stray whitespace "
+                "(empty for numeric variables).\n"
+                "- **flags**: review warnings. `high_missingness` (>= 20% missing), "
+                "`odd_tokens` (odd characters found), `high_cardinality` (categorical with "
+                "> 50 levels). An empty list means no issues were detected."
+            )
         is_numeric = prof["dtype"] == "numeric"
         method = st.selectbox("Banding method", ["by_bins", "by_magnitude"]) if is_numeric else "by_bins"
         n_bins = st.number_input("Number of bins", min_value=2, max_value=50, value=10)
