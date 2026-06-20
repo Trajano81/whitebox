@@ -76,6 +76,8 @@ def page_one_way(wb):
     rebase = oc1.checkbox("Rebase", value=True)
     infinity_lower = oc2.checkbox("Infinity lower band", value=True)
     infinity_higher = oc3.checkbox("Infinity higher band", value=True)
+
+    st.markdown("**Banding and axis range**")
     bc1, bc2, bc3 = st.columns(3)
     nlevels = bc1.number_input("Bands (numeric, nlevels; 0 = auto)", 0, 100, 0)
     pstart = bc2.number_input("Percentile start", 0, 100, 10)
@@ -146,7 +148,9 @@ def page_two_way(wb):
     st.divider()
     st.markdown("**Axis main options**")
     rebase = st.checkbox("Rebase", value=True, key="bv_rebase")
-    st.caption("Bands per variable (numeric; 0 = auto)")
+
+    st.markdown("**Banding per variable**")
+    st.caption("Numeric only; 0 = auto")
     v1c1, v1c2, v1c3 = st.columns(3)
     nlevels_var1 = v1c1.number_input("var1 nlevels", 0, 100, 0, key="bv_nl1")
     ps1 = v1c2.number_input("var1 percentile start", 0, 100, 1, key="bv_ps1")
