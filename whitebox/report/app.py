@@ -193,7 +193,6 @@ def page_one_way(wb):
 
         st.markdown("**Labels**")
         plot_name = st.text_input("Plot title", value="Univariate Plot")
-    st.divider()
 
     # Auto-render: build kwargs from the current widget values and draw on every
     # rerun. _univariate_html caches on (var, opts) so toggling a widget that
@@ -270,7 +269,6 @@ def page_two_way(wb):
 
         st.markdown("**Labels**")
         plot_title = st.text_input("Plot title", value="Bivariate plot", key="bv_title")
-    st.divider()
 
     # Auto-render: build kwargs from the current widget values and draw on every
     # rerun. _bivariate_html caches on (var1, var2, opts) so a repeated combination
@@ -477,6 +475,16 @@ def main():
     # Wide layout uses the full window width (the default centered column is too
     # narrow for the plots + legend). Must be the first Streamlit call.
     st.set_page_config(page_title="Whitebox report", layout="wide")
+    # Trim Streamlit's large default top padding (wide layout ships ~6rem) and the
+    # page header margins so the title sits higher and the chart is visible without
+    # scrolling.
+    st.markdown(
+        "<style>"
+        ".block-container{padding-top:1.5rem;padding-bottom:1rem;}"
+        "h1,h2{margin-top:0.25rem;padding-top:0;}"
+        "</style>",
+        unsafe_allow_html=True,
+    )
     if not PKL_PATH:
         st.error("No Whitebox pickle provided.")
         return
