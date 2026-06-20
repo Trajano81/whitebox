@@ -148,15 +148,14 @@ def page_one_way(wb):
     var = st.selectbox("Variable", wb.plottable_variables())
 
     st.markdown("**Series to show**")
-    eff_col, pred_col = st.columns(2)
+    eff_col, pred_col = st.columns([3, 2])
     with eff_col, st.container(border=True):
         st.caption("Model effects")
-        e1, e2, e3 = st.columns(3)
+        e1, e2, e3, e4, e5 = st.columns(5)
         shap = e1.checkbox("SHAP", value=True)
         # SHAP +/- SD only makes sense with the average SHAP line, so it sits beside it.
         shap_sd = e2.checkbox("SHAP +/- SD", value=False, disabled=not shap)
         shap_points = e3.checkbox("SHAP points", value=False)
-        e4, e5, _e6 = st.columns(3)
         glm = e4.checkbox("GLM indication", value=False)
         weight = e5.checkbox("Weight", value=True)
     with pred_col, st.container(border=True):
@@ -167,7 +166,7 @@ def page_one_way(wb):
         actuals = p3.checkbox("Actuals", value=False)
 
     st.markdown("**Axis main options**")
-    oc1, oc2, oc3, _ = st.columns([1, 1, 1, 3])
+    oc1, oc2, oc3, _ = st.columns([1, 1, 1, 1])
     rebase = oc1.checkbox("Rebase", value=True)
     infinity_lower = oc2.checkbox("Infinity lower band", value=True)
     infinity_higher = oc3.checkbox("Infinity higher band", value=True)
@@ -240,7 +239,7 @@ def page_two_way(wb):
     var2 = st.selectbox("Variable 2", options, index=min(1, len(options) - 1), key="bv2")
 
     st.markdown("**Series to show**")
-    eff_col, pred_col = st.columns(2)
+    eff_col, pred_col = st.columns([1, 1])
     with eff_col, st.container(border=True):
         st.caption("Model effects")
         e1, e2 = st.columns(2)
